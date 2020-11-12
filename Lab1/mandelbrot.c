@@ -23,6 +23,7 @@
 #endif
 
 color_t *color = NULL;
+int row_num = 0;
 
 #if NB_THREADS > 0
 // Compiled only when several threads are used
@@ -142,9 +143,16 @@ int naive_partition_h = ceil( (double)parameters->height / (double)NB_THREADS);
 //printf("Integer (%d): %d\n", sizeof(int), naive_partition_h);
 
 parameters->begin_h = naive_partition_h * args->id; // 0,1 .. NB_THREADS - 1
-parameters->end_h = parameters->begin_h + naive_partition_h;
+// security to dont go over the image height
+if (parameters->begin_h + naive_partition_h <= parameters->height){
+	parameters->end_h = parameters->begin_h + naive_partition_h;
+}
+else {
+	parameters->end_h = parameters->height;
+}
 parameters->begin_w = 0;
 parameters->end_w = parameters->width;
+printf("Integer (%d): %d\n", sizeof(int), parameters->end_h);
 
 // Go
 compute_chunk(parameters);
@@ -165,7 +173,21 @@ for (int i = args->id; i < parameters->height; i += NB_THREADS) {
 #endif
 // Compiled only if LOADBALANCE = 2
 #if LOADBALANCE == 2
-	// *optional* replace this code with another load-balancing solution.
+	// dynamic solution, using mutex
+
+	while(row_num < parameters->height)
+	{
+
+		pthread_mutex_lock(&mtx);
+		parameters->begin_w = 0;
+		parameters->end_w = parameters->width;
+		parameters->begin_h = row_num;
+		parameters->end_h = row_num +1;
+		row_num += 1;
+		pthread_mutex_unlock(&mtx);
+
+		compute_chunk(parameters);
+	}
 
 
 #endif
