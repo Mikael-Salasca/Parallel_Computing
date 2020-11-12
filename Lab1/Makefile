@@ -9,8 +9,8 @@ LOWER_R=-2
 UPPER_R=0.6
 LOWER_I=-1
 UPPER_I=1
-NB_THREADS=0
-LOADBALANCE=0
+NB_THREADS=8
+LOADBALANCE=1
 MANDELBROT_COLOR=0
 GLUT=0
 
@@ -34,10 +34,10 @@ mandelbrot-$(MAXITER)-$(WIDTH)-$(HEIGHT)-$(LOWER_R)-$(UPPER_R)-$(LOWER_I)-$(UPPE
 
 mandelbrot-$(MAXITER)-$(WIDTH)-$(HEIGHT)-$(LOWER_R)-$(UPPER_R)-$(LOWER_I)-$(UPPER_I)-$(NB_THREADS)-$(LOADBALANCE).o: mandelbrot.c
 	gcc $(CFLAGS) -c -o mandelbrot-$(MAXITER)-$(WIDTH)-$(HEIGHT)-$(LOWER_R)-$(UPPER_R)-$(LOWER_I)-$(UPPER_I)-$(NB_THREADS)-$(LOADBALANCE).o mandelbrot.c
-	
+
 ppm.o: ppm.c
 	gcc $(CFLAGS) -c -o ppm.o ppm.c
-	
+
 gl_mandelbrot.o: gl_mandelbrot.c
 	gcc $(CFLAGS) -c -o gl_mandelbrot.o gl_mandelbrot.c
 

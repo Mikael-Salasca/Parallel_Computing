@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <malloc.h>
+#include <math.h>
 
 #include "mandelbrot.h"
 #include "ppm.h"
@@ -136,57 +137,37 @@ parallel_mandelbrot(struct mandelbrot_thread *args, struct mandelbrot_param *par
 {
 // Compiled only if LOADBALANCE = 0
 #if LOADBALANCE == 0
-	// Replace this code with a naive *parallel* implementation.
-	// Only thread of ID 0 compute the whole picture
-	if(args->id == 0)
-	{
-		// Define the region compute_chunk() has to compute
-		// Entire height: from 0 to picture's height
-		parameters->begin_h = 0;
-		parameters->end_h = parameters->height;
-		// Entire width: from 0 to picture's width
-		parameters->begin_w = 0;
-		parameters->end_w = parameters->width;
+// Naive implementation, each thread get an equally subarea
+int naive_partition_h = ceil( (double)parameters->height / (double)NB_THREADS);
+//printf("Integer (%d): %d\n", sizeof(int), naive_partition_h);
 
-		// Go
-		compute_chunk(parameters);
-	}
+parameters->begin_h = naive_partition_h * args->id; // 0,1 .. NB_THREADS - 1
+parameters->end_h = parameters->begin_h + naive_partition_h;
+parameters->begin_w = 0;
+parameters->end_w = parameters->width;
+
+// Go
+compute_chunk(parameters);
 #endif
 // Compiled only if LOADBALANCE = 1
 #if LOADBALANCE == 1
-	// Replace this code with your load-balanced smarter solution.
-	// Only thread of ID 0 compute the whole picture
-	if(args->id == 0)
-	{
-		// Define the region compute_chunk() has to compute
-		// Entire height: from 0 to picture's height
-		parameters->begin_h = 0;
-		parameters->end_h = parameters->height;
-		// Entire width: from 0 to picture's width
-		parameters->begin_w = 0;
-		parameters->end_w = parameters->width;
+// ROW PARTITIONING
+for (int i = args->id; i < parameters->height; i += NB_THREADS) {
+	parameters->begin_h = i;
+	parameters->end_h = i + 1;
+	parameters->begin_w = 0;
+	parameters->end_w = parameters->width;
 
-		// Go
-		compute_chunk(parameters);
-	}
+	// Go
+	compute_chunk(parameters);
+}
+
 #endif
 // Compiled only if LOADBALANCE = 2
 #if LOADBALANCE == 2
 	// *optional* replace this code with another load-balancing solution.
-	// Only thread of ID 0 compute the whole picture
-	if(args->id == 0)
-	{
-		// Define the region compute_chunk() has to compute
-		// Entire height: from 0 to picture's height
-		parameters->begin_h = 0;
-		parameters->end_h = parameters->height;
-		// Entire width: from 0 to picture's width
-		parameters->begin_w = 0;
-		parameters->end_w = parameters->width;
 
-		// Go
-		compute_chunk(parameters);
-	}
+
 #endif
 }
 /***** end *****/
@@ -248,7 +229,7 @@ run_thread(void * buffer)
 
 		// Wait for the next work signal
 		pthread_barrier_wait(&thread_pool_barrier);
-	
+
 		// Fetch the latest parameters
 		param = mandelbrot_param;
 	}
