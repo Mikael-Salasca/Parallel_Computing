@@ -179,13 +179,13 @@ for (int i = args->id; i < parameters->height; i += NB_THREADS) {
 	{
 
 		pthread_mutex_lock(&mtx);
-		parameters->begin_w = 0;
-		parameters->end_w = parameters->width;
 		parameters->begin_h = row_num;
 		parameters->end_h = row_num +1;
 		row_num += 1;
 		pthread_mutex_unlock(&mtx);
 
+		parameters->begin_w = 0;
+		parameters->end_w = parameters->width;
 		compute_chunk(parameters);
 	}
 
