@@ -175,7 +175,7 @@ for (int i = args->id; i < parameters->height; i += NB_THREADS) {
 #if LOADBALANCE == 2
 	// dynamic solution, using mutex
 
-	while(row_num < parameters->height)
+	while(row_num <= parameters->height)
 	{
 
 		pthread_mutex_lock(&mtx);
