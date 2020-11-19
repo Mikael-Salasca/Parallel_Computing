@@ -326,7 +326,7 @@ test_aba()
   printf("Stack after: ");
   stack_print(stack);
 
-  if(stack->head->val != 3)
+  if(stack->head != C)
       aba_detected = 1;
 
   success = aba_detected;
