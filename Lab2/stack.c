@@ -45,15 +45,6 @@
 #endif
 #endif
 
-struct cell_t * create_cell (int v) {
-    cell_t *  new;
-    new = malloc(sizeof(struct cell));
-    new->val = v;
-    new->next = NULL;
-    return new;
-}
-
-
 int
 stack_check(stack_t *stack)
 {
@@ -70,28 +61,29 @@ stack_check(stack_t *stack)
 }
 
 int /* Return the type you prefer */
-stack_push(stack_t * s, int val)
+stack_push(stack_t * s, cell_t* c)
 {
-	assert(s != NULL);
 	cell_t* old;
-	cell_t* new_cell = create_cell(val);
-
 
 #if NON_BLOCKING == 0
   // Implement a lock_based stack
 	pthread_mutex_lock(&mtx);
-	new_cell->next = s->head;
-  s->head = new_cell;
+	c->next = s->head;
+  s->head = c;
   pthread_mutex_unlock(&mtx);
 
 
 #elif NON_BLOCKING == 1
   // Implement a harware CAS-based stack
-	do {
-	    old = s->head;
-	    new_cell->next = old;
-	  } while(cas((size_t*)&s->head, (size_t)old, (size_t)new_cell) != (size_t)old);
+		do {
+			old = s->head;
+			c->next = old;
+		} while(cas(((size_t*)&(s->head)), ((size_t)(old)), ((size_t)c)) != (size_t)old);
 
+		//#if MEASURE == 0
+		// printf("Push done : ");
+		// stack_print(s);
+		//#endif
 
 
 #else
@@ -109,23 +101,29 @@ stack_push(stack_t * s, int val)
 
 int /* Return the type you prefer */
 stack_pop(stack_t* s) {
+  assert(s != NULL);
+
 #if NON_BLOCKING == 0
   // Implement a lock_based stack
-  cell_t* to_remove;
 
   pthread_mutex_lock(&mtx);
-    to_remove = s->head;
-    s->head = s->head->next;
+  s->head = s->head->next;
   pthread_mutex_unlock(&mtx);
 
 #elif NON_BLOCKING == 1
   // Implement a harware CAS-based stack
-  struct node* old;
+  cell_t* old;
+	cell_t* newHead;
+	do {
+			old = s->head;
+			newHead = s->head->next;
+	} while(cas(((size_t*)&(s->head)), ((size_t)(old)), ((size_t)newHead)) != (size_t)old);
+	// old->next = NULL;
 
-  // removes the element from the stack
-  do {
-      old = s->head;
-  } while(cas((size_t*)&s->head, (size_t)old, (size_t)old->next) != (size_t)old);
+	#if MEASURE == 0
+	// printf("Pop done : ");
+	// stack_print(s);
+	#endif
 
 #else
   /*** Optional ***/
@@ -133,4 +131,24 @@ stack_pop(stack_t* s) {
 #endif
 
   return 0;
+}
+
+void stack_free(stack_t *s){
+
+  cell_t* cur = s->head;
+  while(cur != NULL){
+		cell_t* tmp = cur;
+    cur = cur->next;
+    free(tmp);
+  }
+}
+
+void stack_print (stack_t * s) {
+    cell_t* cur = s->head;
+    printf("Stack : [");
+    while (cur != NULL) {
+        printf("%d, ", cur->val);
+        cur = cur->next;
+    }
+    printf("] \n");
 }

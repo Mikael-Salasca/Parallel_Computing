@@ -27,6 +27,8 @@
 #include <stdint.h>
 #include <time.h>
 #include <stddef.h>
+#include <semaphore.h>
+
 
 #include "test.h"
 #include "stack.h"
@@ -83,6 +85,7 @@ assert_fun(int expr, const char *str, const char *file, const char* function, si
 
 stack_t *stack;
 data_t data;
+cell_t *cells[MAX_PUSH_POP];
 
 #if MEASURE != 0
 struct stack_measure_arg
@@ -103,7 +106,7 @@ stack_measure_pop(void* arg)
     clock_gettime(CLOCK_MONOTONIC, &t_start[args->id]);
     for (i = 0; i < MAX_PUSH_POP / NB_THREADS; i++)
       {
-        // See how fast your implementation can pop MAX_PUSH_POP elements in parallel
+        stack_pop(stack);
       }
     clock_gettime(CLOCK_MONOTONIC, &t_stop[args->id]);
 
@@ -119,7 +122,7 @@ stack_measure_push(void* arg)
   clock_gettime(CLOCK_MONOTONIC, &t_start[args->id]);
   for (i = 0; i < MAX_PUSH_POP / NB_THREADS; i++)
     {
-        // See how fast your implementation can push MAX_PUSH_POP elements in parallel
+      stack_push(stack, cells[i]);
     }
   clock_gettime(CLOCK_MONOTONIC, &t_stop[args->id]);
 
@@ -147,7 +150,22 @@ test_setup()
   // Reset explicitely all members to a well-known initial value
   // For instance (to be deleted as your stack design progresses):
   //stack->change_this_member = 0;
+  // Allocate a new stack and reset its values
+  stack = malloc(sizeof(stack_t));
+  stack->head =NULL;
+  // Reset explicitely all members to a well-known initial value
+  // For instance (to be deleted as your stack design progresses):
+  #if MEASURE != 0
+  for(int i = 0; i < MAX_PUSH_POP; i++) {
 
+    cells[i] = malloc(sizeof(cell_t));
+    cells[i]->val = i;
+    cells[i]->next = NULL;
+    #if MEASURE == 1
+      stack_push(stack, cells[i]);
+    #endif
+  }
+  #endif
 
   pthread_mutex_init(&mtx, NULL);
 
@@ -158,6 +176,7 @@ test_teardown()
 {
   // Do not forget to free your stacks after each test
   // to avoid memory leaks
+  stack_free(stack);
   free(stack);
 }
 
@@ -174,7 +193,7 @@ test_push_safe()
   // several threads push concurrently to it
 
   // Do some work
-  stack_push(/* add relevant arguments here */);
+  //stack_push(/* add relevant arguments here */);
 
   // check if the stack is in a consistent state
   int res = assert(stack_check(stack));
@@ -182,7 +201,7 @@ test_push_safe()
   // check other properties expected after a push operation
   // (this is to be updated as your stack design progresses)
   // Now, the test succeeds
-  return res && assert(stack->change_this_member == 0);
+  return res; // && assert(stack->change_this_member == 0);
 }
 
 int
@@ -197,12 +216,119 @@ test_pop_safe()
 // 3 Threads should be enough to raise and detect the ABA problem
 #define ABA_NB_THREADS 3
 
+
+#if NON_BLOCKING > 0
+
+sem_t s0, s1, s2;
+
+void* thread_0_aba()
+{
+  printf("T0 BEGIN\n" );
+  cell_t* old;
+  cell_t* old_next;
+
+  do {
+    old = stack->head;
+    old_next = stack->head->next;
+    // old->next = NULL;
+
+    sem_post(&s1);
+    sem_wait(&s0);
+    printf("T0 RESUME\n" );
+  } while(cas(((size_t*)&(stack->head)), ((size_t)(old)), ((size_t)old_next)) != (size_t)old);
+  printf("T0 END\n" );
+  return 0;
+
+}
+
+void* thread_1_aba()
+{
+  sem_wait(&s1);
+  printf("T1 BEGIN\n" );
+  cell_t* old;
+  cell_t* old_next;
+  do {
+    old = stack->head;
+    old_next = stack->head->next;
+  }while(cas(((size_t*)&(stack->head)), ((size_t)(old)), ((size_t)old_next)) != (size_t)old);
+  // old->next = NULL;
+
+  sem_post(&s2);
+  sem_wait(&s1);
+  stack_push(stack, old);
+  sem_post(&s0);
+  stack_print(stack);
+  printf("T1 END\n" );
+
+  return 0;
+
+}
+
+void* thread_2_aba()
+{
+  sem_wait(&s2);
+
+  printf("T2 BEGIN\n" );
+
+  cell_t* old;
+  cell_t* old_next;
+  do {
+    old = stack->head;
+    old_next = stack->head->next;
+  }while(cas(((size_t*)&(stack->head)), ((size_t)(old)), ((size_t)old_next)) != (size_t)old);
+  old->next = NULL;
+  sem_post(&s1);
+  stack_print(stack);
+  printf("T2 END\n");
+
+  return 0;
+}
+#endif
+
 int
 test_aba()
 {
 #if NON_BLOCKING == 1 || NON_BLOCKING == 2
+
   int success, aba_detected = 0;
   // Write here a test for the ABA problem
+  pthread_t threads[ABA_NB_THREADS];
+  // sem inits
+  sem_init(&s0, 0, 0);
+  sem_init(&s1, 0, 0);
+  sem_init(&s2, 0, 0);
+
+  // push C, B, A
+    cell_t* C = malloc(sizeof(cell_t));
+    C->val = 3;
+    stack_push(stack, C);
+
+    cell_t* B = malloc(sizeof(cell_t));
+    B->val = 2;
+    stack_push(stack, B);
+
+    cell_t* A = malloc(sizeof(cell_t));
+    A->val = 1;
+    stack_push(stack, A);
+
+  printf("Stack before \n");
+  stack_print(stack);
+
+  // threads with their aba function
+  pthread_create(&threads[0], NULL, thread_0_aba, NULL);
+  pthread_create(&threads[1], NULL, thread_1_aba, NULL);
+  pthread_create(&threads[2], NULL, thread_2_aba, NULL);
+
+  for (int i = 0; i < 3; i++)  {
+      pthread_join(threads[i], NULL);
+  }
+
+  printf("Stack after: ");
+  stack_print(stack);
+
+  if(stack->head->val != 3)
+      aba_detected = 1;
+
   success = aba_detected;
   return success;
 #else
@@ -307,6 +433,7 @@ setbuf(stdout, NULL);
 
   test_finalize();
 #else
+  test_setup();
   int i;
   pthread_t thread[NB_THREADS];
   pthread_attr_t attr;
