@@ -231,11 +231,14 @@ void* thread_0_aba()
     old = stack->head;
     old_next = stack->head->next;
     // old->next = NULL;
-
+    stack_print(stack);
     sem_post(&s1);
     sem_wait(&s0);
     printf("T0 RESUME\n" );
+    stack_print(stack);
   } while(cas(((size_t*)&(stack->head)), ((size_t)(old)), ((size_t)old_next)) != (size_t)old);
+  printf("old next %d %p\n", old_next->val, old_next->next);
+  stack_print(stack);
   printf("T0 END\n" );
   return 0;
 
@@ -255,11 +258,11 @@ void* thread_1_aba()
 
   sem_post(&s2);
   sem_wait(&s1);
+  printf("T1 RESUME \n" );
   stack_push(stack, old);
-  sem_post(&s0);
   stack_print(stack);
   printf("T1 END\n" );
-
+  sem_post(&s0);
   return 0;
 
 }
@@ -277,10 +280,9 @@ void* thread_2_aba()
     old_next = stack->head->next;
   }while(cas(((size_t*)&(stack->head)), ((size_t)(old)), ((size_t)old_next)) != (size_t)old);
   old->next = NULL;
-  sem_post(&s1);
   stack_print(stack);
   printf("T2 END\n");
-
+  sem_post(&s1);
   return 0;
 }
 #endif
@@ -313,6 +315,12 @@ test_aba()
 
   printf("Stack before \n");
   stack_print(stack);
+
+  printf("A :%d %p \n", A->val, A);
+  printf("B :%d %p \n", B->val, B);
+  printf("C :%d %p \n", C->val, C);
+
+
 
   // threads with their aba function
   pthread_create(&threads[0], NULL, thread_0_aba, NULL);
