@@ -223,7 +223,7 @@ sem_t s0, s1, s2;
 
 void* thread_0_aba()
 {
-  printf("T0 BEGIN\n" );
+  printf("T0 BEGIN - START POP\n" );
   cell_t* old;
   cell_t* old_next;
 
@@ -234,10 +234,10 @@ void* thread_0_aba()
     stack_print(stack);
     sem_post(&s1);
     sem_wait(&s0);
-    printf("T0 RESUME\n" );
+    printf("T0 RESUME - POPS (& sets old next)\n" );
     stack_print(stack);
   } while(cas(((size_t*)&(stack->head)), ((size_t)(old)), ((size_t)old_next)) != (size_t)old);
-  printf("old next %d %p\n", old_next->val, old_next->next);
+  printf("old next val - %d, next - %p\n", old_next->val, old_next->next);
   stack_print(stack);
   printf("T0 END\n" );
   return 0;
@@ -247,7 +247,7 @@ void* thread_0_aba()
 void* thread_1_aba()
 {
   sem_wait(&s1);
-  printf("T1 BEGIN\n" );
+  printf("T1 BEGIN - POPS \n" );
   cell_t* old;
   cell_t* old_next;
   do {
@@ -255,10 +255,10 @@ void* thread_1_aba()
     old_next = stack->head->next;
   }while(cas(((size_t*)&(stack->head)), ((size_t)(old)), ((size_t)old_next)) != (size_t)old);
   // old->next = NULL;
-
+  stack_print(stack);
   sem_post(&s2);
   sem_wait(&s1);
-  printf("T1 RESUME \n" );
+  printf("T1 RESUME - PUSH \n" );
   stack_push(stack, old);
   stack_print(stack);
   printf("T1 END\n" );
@@ -271,7 +271,7 @@ void* thread_2_aba()
 {
   sem_wait(&s2);
 
-  printf("T2 BEGIN\n" );
+  printf("T2 BEGIN - POPS \n" );
 
   cell_t* old;
   cell_t* old_next;
