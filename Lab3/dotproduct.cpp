@@ -19,6 +19,7 @@ float mult ( float a , float b ) {
 	return a * b ;
 }
 
+
 int main(int argc, const char* argv[])
 {
 	if (argc < 2)
@@ -36,26 +37,26 @@ int main(int argc, const char* argv[])
 	/* Skeleton instances */
 	auto dotprod_comb= skepu::MapReduce<2>(mult,add);
 
-	// auto dotprod_map = skepu::Map<2>(mult);
-	// auto dotprod_red = skepu::Reduce<2>(add);
+	auto tmp = skepu::Map<2>(mult);
+	auto dotprod_sep = skepu::Reduce(add);
 
 
 	/* SkePU containers */
 	skepu::Vector<float> v1(size, 1.0f), v2(size, 2.0f);
-	// need one more ?
+	skepu::Vector<float> v3(size, 0.0f);
 
 	/* Compute and measure time */
 	float resComb, resSep;
 
 	auto timeComb = skepu::benchmark::measureExecTime([&]
 	{
-		dotprod_comb(resComb,v1,v2);
+		resComb = dotprod_comb(v1,v2);
 	});
 
 	auto timeSep = skepu::benchmark::measureExecTime([&]
 	{
-		// dotprod_map(v1,v2);
-		// dotprod_red(v1,v2);
+		tmp(v3,v1,v2);
+		resSep = dotprod_sep(v3);
 
 	});
 

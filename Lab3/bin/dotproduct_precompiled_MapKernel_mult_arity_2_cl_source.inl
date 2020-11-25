@@ -1,5 +1,5 @@
 
-class CLWrapperClass_addone_precompiled_MapKernel_addOneFunc_arity_1
+class CLWrapperClass_dotproduct_precompiled_MapKernel_mult_arity_2
 {
 public:
 
@@ -74,13 +74,13 @@ enum {
 	SKEPU_EDGE_PAD = 3,
 };
 
-static float addOneFunc(float a)
+static float mult(float a, float b)
 {
-	return a+1;
+	return a * b ;
 }
 
 
-__kernel void addone_precompiled_MapKernel_addOneFunc_arity_1( __global float* skepu_output, __global float *a,   size_t skepu_n, size_t skepu_base)
+__kernel void dotproduct_precompiled_MapKernel_mult_arity_2( __global float* skepu_output, __global float *a, __global float *b,   size_t skepu_n, size_t skepu_base)
 {
 	size_t skepu_i = get_global_id(0);
 	size_t skepu_gridSize = get_local_size(0) * get_num_groups(0);
@@ -91,9 +91,9 @@ __kernel void addone_precompiled_MapKernel_addOneFunc_arity_1( __global float* s
 		
 		
 #if !0
-		skepu_output[skepu_i] = addOneFunc(a[skepu_i]);
+		skepu_output[skepu_i] = mult(a[skepu_i], b[skepu_i]);
 #else
-		skepu_multiple skepu_out_temp = addOneFunc(a[skepu_i]);
+		skepu_multiple skepu_out_temp = mult(a[skepu_i], b[skepu_i]);
 		
 #endif
 		skepu_i += skepu_gridSize;
@@ -107,8 +107,8 @@ __kernel void addone_precompiled_MapKernel_addOneFunc_arity_1( __global float* s
 		{
 			cl_int err;
 			cl_program program = skepu::backend::cl_helpers::buildProgram(device, source);
-			cl_kernel kernel = clCreateKernel(program, "addone_precompiled_MapKernel_addOneFunc_arity_1", &err);
-			CL_CHECK_ERROR(err, "Error creating map kernel 'addone_precompiled_MapKernel_addOneFunc_arity_1'");
+			cl_kernel kernel = clCreateKernel(program, "dotproduct_precompiled_MapKernel_mult_arity_2", &err);
+			CL_CHECK_ERROR(err, "Error creating map kernel 'dotproduct_precompiled_MapKernel_mult_arity_2'");
 
 			skepu_kernels(counter++, &kernel);
 		}
@@ -120,11 +120,11 @@ __kernel void addone_precompiled_MapKernel_addOneFunc_arity_1( __global float* s
 	static void map
 	(
 		size_t skepu_deviceID, size_t skepu_localSize, size_t skepu_globalSize,
-		 skepu::backend::DeviceMemPointer_CL<float> *skepu_output, skepu::backend::DeviceMemPointer_CL<float> *a,  Ignore, 
+		 skepu::backend::DeviceMemPointer_CL<float> *skepu_output, skepu::backend::DeviceMemPointer_CL<float> *a, skepu::backend::DeviceMemPointer_CL<float> *b,  Ignore, 
 		size_t skepu_n, size_t skepu_base
 	)
 	{
-		skepu::backend::cl_helpers::setKernelArgs(skepu_kernels(skepu_deviceID),  skepu_output->getDeviceDataPointer(), a->getDeviceDataPointer(),   skepu_n, skepu_base);
+		skepu::backend::cl_helpers::setKernelArgs(skepu_kernels(skepu_deviceID),  skepu_output->getDeviceDataPointer(), a->getDeviceDataPointer(), b->getDeviceDataPointer(),   skepu_n, skepu_base);
 		cl_int skepu_err = clEnqueueNDRangeKernel(skepu::backend::Environment<int>::getInstance()->m_devices_CL.at(skepu_deviceID)->getQueue(), skepu_kernels(skepu_deviceID), 1, NULL, &skepu_globalSize, &skepu_localSize, 0, NULL, NULL);
 		CL_CHECK_ERROR(skepu_err, "Error launching Map kernel");
 	}
