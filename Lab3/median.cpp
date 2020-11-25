@@ -49,11 +49,7 @@ int main(int argc, char* argv[])
 	// Read the padded image into a matrix. Create the output matrix without padding.
 	ImageInfo imageInfo;
 	skepu::Matrix<unsigned char> inputMatrix = ReadAndPadPngFileToMatrix(inputFileName, radius, colorType, imageInfo);
-	std::cout << imageInfo.height << ", " << imageInfo.width << std::endl;
-	std::cout << inputMatrix.total_cols() << ", " << inputMatrix.total_rows() << std::endl;
 	skepu::Matrix<unsigned char> outputMatrix(imageInfo.height, imageInfo.width * imageInfo.elementsPerPixel, 120);
-	
-	std::cout << outputMatrix.total_cols() << ", " << outputMatrix.total_rows() << std::endl;
 	
 	// Skeleton instance
 	auto calculateMedian = skepu::MapOverlap(median_kernel);

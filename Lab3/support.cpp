@@ -47,7 +47,6 @@ ReadAndPadPngFileToMatrix(std::string filePath, int kernelRadius, LodePNGColorTy
 		std::cout << "decoder error " << error << ": " << lodepng_error_text(error) << std::endl;
 	
 	int elementsPerPixel = (colorType == LCT_GREY) ? 1 : 3;
-	std::cout << "Här: " << imageHeight << ", " << imageWidth << ", " << kernelRadius << std::endl;
 	
 	// Create a matrix which fits the image and the padding needed.
 	skepu::Matrix<unsigned char> inputMatrix(imageHeight + 2*kernelRadius, (imageWidth + 2*kernelRadius) * elementsPerPixel);

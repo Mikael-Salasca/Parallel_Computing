@@ -18,7 +18,7 @@
 # Default values which can be changed in Makefile.in
 
 # Default backend set for SkePU precompiler.
-BACKENDS = -openmp -opencl #-cuda (CUDA doesn't work in this distribution!)
+BACKENDS = -openmp -opencl -cuda
 
 # Backend-specific flags
 #BACKEND_FLAGS = -DSKEPU_DEBUG=2
@@ -84,5 +84,4 @@ endif
 TARGET_FLAGS = -g $(OPTIMIZE_LVL) -std=c++11 $(SKEPU_OPTIONS) -I $(SKEPU_SRC)/include -I ./  $(NVCCPASS) -Wno-attributes $(BACKEND_FLAGS) $(SKEPU_DEFINES)
 
 # Flags for non-preprocessed compilation.
-SEQ_FLAGS = -std=c++11 -O3 -I $(SKEPU_SRC)/include -Wno-attributes # -fno-rtti -fno-exceptions 
-
+SEQ_FLAGS = -std=c++11 -O3 -I $(SKEPU_SRC)/include -Wno-attributes # -fno-rtti -fno-exceptions

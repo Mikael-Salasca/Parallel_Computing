@@ -512,14 +512,14 @@ namespace skepu
 		
 #ifdef SKEPU_CUDA
 			
-			template<size_t... AI, size_t... CI, typename... CallArgs>
-			void mapOverlapSingleThread_CU(size_t deviceID, Matrix<Ret>& res, Matrix<T>& arg, pack_indices<AI...>, pack_indices<CI...>,  CallArgs&&... args);
+			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
+			void mapOverlapSingleThread_CU(size_t deviceID, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args);
 			
-			template<size_t... AI, size_t... CI, typename... CallArgs>
-			void mapOverlapMultipleThread_CU(size_t numDevices, Matrix<Ret>& res, Matrix<T>& arg, pack_indices<AI...>, pack_indices<CI...>,  CallArgs&&... args);
+			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
+			void mapOverlapMultipleThread_CU(size_t numDevices, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args);
 			
-			template<size_t... AI, size_t... CI, typename... CallArgs>
-			void helper_CUDA(skepu::Matrix<Ret>& res, skepu::Matrix<T>& arg, pack_indices<AI...> ai, pack_indices<CI...> ci,  CallArgs&&... args);
+			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
+			void helper_CUDA(pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args);
 			
 #endif
 			
@@ -568,7 +568,7 @@ namespace skepu
 #endif
 				case Backend::Type::CUDA:
 #ifdef SKEPU_CUDA
-					this->helper_CUDA(res, arg, any_indices, const_indices, std::forward<CallArgs>(args)...);
+					this->helper_CUDA(out_indices, elwise_indices, any_indices, const_indices, std::forward<CallArgs>(args)...);
 					break;
 #endif
 				case Backend::Type::OpenCL:
