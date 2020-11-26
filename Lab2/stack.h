@@ -44,13 +44,12 @@ typedef struct stack stack_t;
 
 
 int stack_push(stack_t * s, cell_t* c);
-int stack_pop(stack_t * s);
+cell_t* stack_pop(stack_t* s);
 
 pthread_mutex_t mtx;
 
 /* Use this to check if your stack is in a consistent state from time to time */
 int stack_check(stack_t *stack);
-void stack_free(stack_t *s);
 void stack_print (stack_t *s);
 
 

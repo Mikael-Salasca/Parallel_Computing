@@ -60,8 +60,7 @@ stack_check(stack_t *stack)
 	return 1;
 }
 
-int /* Return the type you prefer */
-stack_push(stack_t * s, cell_t* c)
+int stack_push(stack_t * s, cell_t* c)
 {
 	cell_t* old;
 
@@ -80,67 +79,36 @@ stack_push(stack_t * s, cell_t* c)
 			c->next = old;
 		} while(cas(((size_t*)&(s->head)), ((size_t)(old)), ((size_t)c)) != (size_t)old);
 
-		//#if MEASURE == 0
-		// printf("Push done : ");
-		// stack_print(s);
-		//#endif
-
-
-#else
-  /*** Optional ***/
-  // Implement a software CAS-based stack
-#endif
-
   // Debug practice: you can check if this operation results in a stack in a consistent check
   // It doesn't harm performance as sanity check are disabled at measurement time
   // This is to be updated as your implementation progresses
   stack_check((stack_t*)1);
-
+	#endif
   return 0;
 }
 
-int /* Return the type you prefer */
-stack_pop(stack_t* s) {
+cell_t* stack_pop(stack_t* s) {
   assert(s != NULL);
+	cell_t* old;
 
 #if NON_BLOCKING == 0
   // Implement a lock_based stack
-
   pthread_mutex_lock(&mtx);
+	old = s->head;
   s->head = s->head->next;
   pthread_mutex_unlock(&mtx);
 
 #elif NON_BLOCKING == 1
   // Implement a harware CAS-based stack
-  cell_t* old;
 	cell_t* newHead;
 	do {
 			old = s->head;
 			newHead = s->head->next;
 	} while(cas(((size_t*)&(s->head)), ((size_t)(old)), ((size_t)newHead)) != (size_t)old);
-	// old->next = NULL;
-
-	#if MEASURE == 0
-	// printf("Pop done : ");
-	// stack_print(s);
 	#endif
 
-#else
-  /*** Optional ***/
-  // Implement a software CAS-based stack
-#endif
+  return old;
 
-  return 0;
-}
-
-void stack_free(stack_t *s){
-
-  cell_t* cur = s->head;
-  while(cur != NULL){
-		cell_t* tmp = cur;
-    cur = cur->next;
-    free(tmp);
-  }
 }
 
 void stack_print (stack_t * s) {

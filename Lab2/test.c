@@ -85,7 +85,7 @@ assert_fun(int expr, const char *str, const char *file, const char* function, si
 
 stack_t *stack;
 data_t data;
-cell_t *cells[MAX_PUSH_POP];
+cell_t *cells_allocated[MAX_PUSH_POP]; //  POOL MALLOC
 
 #if MEASURE != 0
 struct stack_measure_arg
@@ -97,8 +97,7 @@ typedef struct stack_measure_arg stack_measure_arg_t;
 struct timespec t_start[NB_THREADS], t_stop[NB_THREADS], start, stop;
 
 #if MEASURE == 1
-void*
-stack_measure_pop(void* arg)
+void* stack_measure_pop(void* arg)
   {
     stack_measure_arg_t *args = (stack_measure_arg_t*) arg;
     int i;
@@ -122,7 +121,7 @@ stack_measure_push(void* arg)
   clock_gettime(CLOCK_MONOTONIC, &t_start[args->id]);
   for (i = 0; i < MAX_PUSH_POP / NB_THREADS; i++)
     {
-      stack_push(stack, cells[i]);
+      stack_push(stack, cells_allocated[i]);
     }
   clock_gettime(CLOCK_MONOTONIC, &t_stop[args->id]);
 
@@ -133,19 +132,13 @@ stack_measure_push(void* arg)
 
 /* A bunch of optional (but useful if implemented) unit tests for your stack */
 void
-test_init()
-{
-  // Initialize your test batch
-}
+test_init() {}
 
 void
 test_setup()
 {
   // Allocate and initialize your test stack before each test
   data = DATA_VALUE;
-
-  // Allocate a new stack and reset its values
-  stack = malloc(sizeof(stack_t));
 
   // Reset explicitely all members to a well-known initial value
   // For instance (to be deleted as your stack design progresses):
@@ -156,13 +149,12 @@ test_setup()
   // Reset explicitely all members to a well-known initial value
   // For instance (to be deleted as your stack design progresses):
   #if MEASURE != 0
-  for(int i = 0; i < MAX_PUSH_POP; i++) {
-
-    cells[i] = malloc(sizeof(cell_t));
-    cells[i]->val = i;
-    cells[i]->next = NULL;
+  for(int i = 0; i < MAX_PUSH_POP; i++){
+    cells_allocated[i] = malloc(sizeof(cell_t));
+    cells_allocated[i]->val = i;
+    cells_allocated[i]->next = NULL;
     #if MEASURE == 1
-      stack_push(stack, cells[i]);
+      stack_push(stack, cells_allocated[i]);
     #endif
   }
   #endif
@@ -176,15 +168,17 @@ test_teardown()
 {
   // Do not forget to free your stacks after each test
   // to avoid memory leaks
-  stack_free(stack);
+
+  #if MEASURE != 0
+  for(int i = 0; i < MAX_PUSH_POP; i++){
+     free(cells_allocated[i]);
+  }
+  #endif
   free(stack);
 }
 
 void
-test_finalize()
-{
-  // Destroy properly your test batch
-}
+test_finalize() {}
 
 int
 test_push_safe()
@@ -230,7 +224,6 @@ void* thread_0_aba()
   do {
     old = stack->head;
     old_next = stack->head->next;
-    // old->next = NULL;
     stack_print(stack);
     sem_post(&s1);
     sem_wait(&s0);
@@ -254,7 +247,6 @@ void* thread_1_aba()
     old = stack->head;
     old_next = stack->head->next;
   }while(cas(((size_t*)&(stack->head)), ((size_t)(old)), ((size_t)old_next)) != (size_t)old);
-  // old->next = NULL;
   stack_print(stack);
   sem_post(&s2);
   sem_wait(&s1);
@@ -320,8 +312,6 @@ test_aba()
   printf("B :%d %p \n", B->val, B);
   printf("C :%d %p \n", C->val, C);
 
-
-
   // threads with their aba function
   pthread_create(&threads[0], NULL, thread_0_aba, NULL);
   pthread_create(&threads[1], NULL, thread_1_aba, NULL);
@@ -338,6 +328,11 @@ test_aba()
       aba_detected = 1;
 
   success = aba_detected;
+
+  free(A);
+  free(B);
+  free(C);
+
   return success;
 #else
   // No ABA is possible with lock-based synchronization. Let the test succeed only
@@ -429,18 +424,13 @@ int
 main(int argc, char **argv)
 {
 setbuf(stdout, NULL);
-// MEASURE == 0 -> run unit tests
+// MEASURE == 0 : Unit tests
 #if MEASURE == 0
-  test_init();
-
   test_run(test_cas);
-
   test_run(test_push_safe);
   test_run(test_pop_safe);
   test_run(test_aba);
-
-  test_finalize();
-#else
+#else // MEASURING
   test_setup();
   int i;
   pthread_t thread[NB_THREADS];
@@ -470,6 +460,7 @@ setbuf(stdout, NULL);
     {
         printf("Thread %d time: %f\n", i, timediff(&t_start[i], &t_stop[i]));
     }
+    test_teardown();
 #endif
 
   return 0;
