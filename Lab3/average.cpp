@@ -18,7 +18,7 @@
 
 unsigned char average_kernel(skepu::Region2D<unsigned char> m, size_t elemPerPx)
 {
-	float scaling = 1.0 / ((m.oj/elemPerPx*2+1)*(m.oi*2+1));
+	float scaling = 1.0 / ((m.oj/elemPerPx*2+1)*(m.oi*2+1)); // oj -> x radius, oi -> y radius [2 - 50]
 	float res = 0;
 	for (int y = -m.oi; y <= m.oi; ++y)
 		for (int x = -m.oj; x <= m.oj; x += elemPerPx)
@@ -28,16 +28,31 @@ unsigned char average_kernel(skepu::Region2D<unsigned char> m, size_t elemPerPx)
 
 unsigned char average_kernel_1d(skepu::Region1D<unsigned char> m, size_t elemPerPx)
 {
-	// your code here
-	return m(0);
+	// 	Averaging filters have a property known as separability. This means that the two-dimensional
+	// filtering operation can be separated into two one-dimensional filters instead 2 SkePU also
+	// supports one-dimensional MapOverlaps over matrices, so your task is to reimplement the
+	// averaging filter in this way. The source file already has a few starting points to help you
+	// out.
+	// Note: The edge pixels of the output will not be exactly the same because of differences
+	// in the edge handling. The "safe" region (inset by the filter radius from the edge) should be
+	// identical, however
+	float scaling = 1.0 / ((m.oi/elemPerPx*2+1)); // oj -> x radius, oi -> y radius [2 - 50]
+	float res = 0;
+		for (int x = -m.oj; x <= m.oj; x += elemPerPx)
+			res += m(x);
+	return res * scaling;
 }
 
 
 
 unsigned char gaussian_kernel(skepu::Region1D<unsigned char> m, const skepu::Vec<float> stencil, size_t elemPerPx)
 {
-	// your code here
-	return m(0);
+	float res = 0;
+	int stencilCounter = 0;
+	for (int x = -m.oi; x <= m.oi; x += elemPerPx) {
+		res += m(x) * stencil(stencilCounter++);
+	}
+	return res;
 }
 
 
@@ -50,19 +65,19 @@ int main(int argc, char* argv[])
 		std::cout << "Usage: " << argv[0] << " input output radius [backend]\n";
 		exit(1);
 	}
-	
+
 	LodePNGColorType colorType = LCT_RGB;
 	std::string inputFileName = argv[1];
 	std::string outputFileName = argv[2];
 	const int radius = atoi(argv[3]);
 	auto spec = skepu::BackendSpec{argv[4]};
 	skepu::setGlobalBackendSpec(spec);
-	
+
 	// Create the full path for writing the image.
 	std::stringstream ss;
 	ss << (2 * radius + 1) << "x" << (2 * radius + 1);
 	std::string outputFile = outputFileName + ss.str();
-	
+
 	// Read the padded image into a matrix. Create the output matrix without padding.
 	// Padded version for 2D MapOverlap, non-padded for 1D MapOverlap
 	ImageInfo imageInfo;
@@ -70,56 +85,55 @@ int main(int argc, char* argv[])
 	skepu::Matrix<unsigned char> inputMatrix = ReadPngFileToMatrix(inputFileName, colorType, imageInfo);
 	skepu::Matrix<unsigned char> outputMatrix(imageInfo.height, imageInfo.width * imageInfo.elementsPerPixel, 120);
 	// more containers...?
-	
+
 	// Original version
 	{
 		auto conv = skepu::MapOverlap(average_kernel);
 		conv.setOverlap(radius, radius  * imageInfo.elementsPerPixel);
-	
+
 		auto timeTaken = skepu::benchmark::measureExecTime([&]
 		{
 			conv(outputMatrix, inputMatrixPad, imageInfo.elementsPerPixel);
 		});
-	
+
 		WritePngFileMatrix(outputMatrix, outputFile + "-average.png", colorType, imageInfo);
 		std::cout << "Time for combined: " << (timeTaken.count() / 10E6) << "\n";
 	}
-	
-	
+
+
 	// Separable version
 	// use conv.setOverlapMode(skepu::Overlap::[ColWise RowWise]);
 	// and conv.setOverlap(<integer>)
 	{
 		auto conv = skepu::MapOverlap(average_kernel_1d);
-	
+		conv.setOverlapMode(skepu::Overlap::ColWise);
+		conv.setOverlap(radius*imageInfo.elementsPerPixel)
 		auto timeTaken = skepu::benchmark::measureExecTime([&]
 		{
-			// your code here
+			conv(outputMatrix, inputMatrixPad, imageInfo.elementsPerPixel);
 		});
-		
+
 	//	WritePngFileMatrix(outputMatrix, outputFile + "-separable.png", colorType, imageInfo);
 		std::cout << "Time for separable: " << (timeTaken.count() / 10E6) << "\n";
 	}
-	
-	
+
+
 	// Separable gaussian
 	{
 		skepu::Vector<float> stencil = sampleGaussian(radius);
-			
+
 		// skeleton instance, etc here (remember to set backend)
-	
+
 		auto timeTaken = skepu::benchmark::measureExecTime([&]
 		{
 			// your code here
 		});
-	
+
 	//	WritePngFileMatrix(outputMatrix, outputFile + "-gaussian.png", colorType, imageInfo);
 		std::cout << "Time for gaussian: " << (timeTaken.count() / 10E6) << "\n";
 	}
-	
-	
-	
+
+
+
 	return 0;
 }
-
-

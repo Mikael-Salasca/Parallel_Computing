@@ -1,3 +1,7 @@
+#define SKEPU_PRECOMPILED
+#define SKEPU_OPENMP
+#define SKEPU_OPENCL
+#define SKEPU_CUDA
 #include <cmath>
 
 #include "support.h"
