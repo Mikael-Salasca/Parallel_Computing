@@ -37,14 +37,14 @@ typedef struct cell cell_t;
 struct stack
 {
   cell_t * head;
-  int nb_cells;
+  int index;
 
 };
 typedef struct stack stack_t;
 
 
-int stack_push(stack_t * s, cell_t* c);
-cell_t* stack_pop(stack_t* s);
+int stack_push(stack_t * s, int val, int thread_id);
+cell_t* stack_pop(stack_t* s, int thread_id);
 
 pthread_mutex_t mtx;
 

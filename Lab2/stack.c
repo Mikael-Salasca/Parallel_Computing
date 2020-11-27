@@ -45,6 +45,15 @@
 #endif
 #endif
 
+#define CHUNK_SIZE 1000
+static stack_t pool_array[NB_THREADS];
+
+void init_pool() {
+	for (int i=0; i < NB_THREADS; ++i ){
+		pool_array[i] = malloc(sizeof(stack_t));
+	}
+}
+
 int
 stack_check(stack_t *stack)
 {
@@ -60,9 +69,21 @@ stack_check(stack_t *stack)
 	return 1;
 }
 
-int stack_push(stack_t * s, cell_t* c)
+int stack_push(stack_t * s, int val, int thread_id)
 {
-	cell_t* old;
+	assert(s != NULL && thread_id >= 0 && pool_array[thread_id] != NULL);
+
+	stack_t* pool = &pool_array[thread_id];
+
+	// if pool has no more element, reallocate CHUNK
+	if(pool->index == CHUNK_SIZE){
+		pool->head = malloc(cell_t * CHUNK_SIZE);
+	}
+
+	cell_t* c, old;
+	//p + i = adresse contenue dans p + i*taille(élément pointé par p)
+	c = pool->head + index;
+	pool->index++;
 
 #if NON_BLOCKING == 0
   // Implement a lock_based stack
@@ -87,7 +108,7 @@ int stack_push(stack_t * s, cell_t* c)
   return 0;
 }
 
-cell_t* stack_pop(stack_t* s) {
+cell_t* stack_pop(stack_t* s, int thread_id) {
   assert(s != NULL);
 	cell_t* old;
 
