@@ -38,11 +38,12 @@ struct stack
 {
   cell_t * head;
   int index;
-  stack_t * next_chunk;
+  struct stack * next_chunk;
 
 };
 typedef struct stack stack_t;
 
+void init_pool();
 
 int stack_push(stack_t * s, int val, int thread_id);
 cell_t* stack_pop(stack_t* s, int thread_id);

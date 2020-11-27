@@ -85,7 +85,6 @@ assert_fun(int expr, const char *str, const char *file, const char* function, si
 
 stack_t *stack;
 data_t data;
-cell_t *cells_allocated[MAX_PUSH_POP]; //  POOL MALLOC
 
 #if MEASURE != 0
 struct stack_measure_arg
@@ -105,7 +104,7 @@ void* stack_measure_pop(void* arg)
     clock_gettime(CLOCK_MONOTONIC, &t_start[args->id]);
     for (i = 0; i < MAX_PUSH_POP / NB_THREADS; i++)
       {
-        stack_pop(stack);
+        stack_pop(stack,args->id);
       }
     clock_gettime(CLOCK_MONOTONIC, &t_stop[args->id]);
 
@@ -121,7 +120,7 @@ stack_measure_push(void* arg)
   clock_gettime(CLOCK_MONOTONIC, &t_start[args->id]);
   for (i = 0; i < MAX_PUSH_POP / NB_THREADS; i++)
     {
-      stack_push(stack, cells_allocated[i]);
+      stack_push(stack, i, args->id);
     }
   clock_gettime(CLOCK_MONOTONIC, &t_stop[args->id]);
 
@@ -139,27 +138,21 @@ test_setup()
 {
   // Allocate and initialize your test stack before each test
   data = DATA_VALUE;
-
-  // Reset explicitely all members to a well-known initial value
-  // For instance (to be deleted as your stack design progresses):
-  //stack->change_this_member = 0;
-  // Allocate a new stack and reset its values
   stack = malloc(sizeof(stack_t));
   stack->head =NULL;
-  // Reset explicitely all members to a well-known initial value
-  // For instance (to be deleted as your stack design progresses):
-  #if MEASURE != 0
-  for(int i = 0; i < MAX_PUSH_POP; i++){
-    cells_allocated[i] = malloc(sizeof(cell_t));
-    cells_allocated[i]->val = i;
-    cells_allocated[i]->next = NULL;
-    #if MEASURE == 1
-      stack_push(stack, cells_allocated[i]);
-    #endif
+  pthread_mutex_init(&mtx, NULL);
+  init_pool();
+  // pops needs some element
+  #if MEASURE == 1
+  for(int i=0; i < NB_THREADS; ++i){
+    for (int j=0; j < MAX_PUSH_POP/NB_THREADS; ++j){
+      stack_push(stack,j,i);
+    }
   }
+
+
   #endif
 
-  pthread_mutex_init(&mtx, NULL);
 
 }
 
@@ -168,12 +161,7 @@ test_teardown()
 {
   // Do not forget to free your stacks after each test
   // to avoid memory leaks
-
-  #if MEASURE != 0
-  for(int i = 0; i < MAX_PUSH_POP; i++){
-     free(cells_allocated[i]);
-  }
-  #endif
+  //TODO
   free(stack);
 }
 
@@ -215,6 +203,16 @@ test_pop_safe()
 
 sem_t s0, s1, s2;
 
+int push_clone(stack_t * s, cell_t* c){
+  cell_t* old;
+  do {
+    old = stack->head;
+    c->next = old;
+  } while(cas(((size_t*)&(s->head)), ((size_t)(old)), ((size_t)c)) != (size_t)old);
+  return 0;
+}
+
+
 void* thread_0_aba()
 {
   printf("T0 BEGIN - START POP\n" );
@@ -251,7 +249,7 @@ void* thread_1_aba()
   sem_post(&s2);
   sem_wait(&s1);
   printf("T1 RESUME - PUSH \n" );
-  stack_push(stack, old);
+  push_clone(stack,old);
   stack_print(stack);
   printf("T1 END\n" );
   sem_post(&s0);
@@ -295,15 +293,15 @@ test_aba()
   // push C, B, A
     cell_t* C = malloc(sizeof(cell_t));
     C->val = 3;
-    stack_push(stack, C);
+    push_clone(stack, C);
 
     cell_t* B = malloc(sizeof(cell_t));
     B->val = 2;
-    stack_push(stack, B);
+    push_clone(stack, B);
 
     cell_t* A = malloc(sizeof(cell_t));
     A->val = 1;
-    stack_push(stack, A);
+    push_clone(stack, A);
 
   printf("Stack before \n");
   stack_print(stack);

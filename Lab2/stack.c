@@ -45,14 +45,14 @@
 #endif
 #endif
 
+#define CHUNK_SIZE 1000
 static stack_t pool_array[NB_THREADS];
 
 void init_pool() {
 	for (int i=0; i < NB_THREADS; ++i ){
-		pool_array[i] = malloc(sizeof(stack_t));
-		pool_array[i]->head = malloc(cell_t * CHUNK_SIZE);
-		pool_array[i]->index = 0;
-		pool_array[i]->next_chunk = NULL;
+		pool_array[i].head = malloc(sizeof(cell_t) * CHUNK_SIZE);
+		pool_array[i].index = 0;
+		pool_array[i].next_chunk = NULL;
 	}
 }
 
@@ -73,7 +73,7 @@ stack_check(stack_t *stack)
 
 int stack_push(stack_t * s, int val, int thread_id)
 {
-	assert(s != NULL && thread_id >= 0 && pool_array[thread_id] != NULL);
+	assert(s != NULL && thread_id >= 0);
 
 	stack_t* pool = &pool_array[thread_id];
 
@@ -81,8 +81,8 @@ int stack_push(stack_t * s, int val, int thread_id)
 	if(pool->index == CHUNK_SIZE){
 		if (pool->next_chunk == NULL){
 			pool->next_chunk = malloc(sizeof(stack_t));
-			pool->next_chunk->head = malloc(cell_t * CHUNK_SIZE);
-			pool->next->index = 0;
+			pool->next_chunk->head = malloc(sizeof(cell_t) * CHUNK_SIZE);
+			pool->next_chunk->index = 0;
 			pool = pool->next_chunk;
 		}
 		else {
@@ -91,9 +91,12 @@ int stack_push(stack_t * s, int val, int thread_id)
 
 	}
 
-	cell_t* c, old;
+	cell_t* c;
+	cell_t* old;
+
 	//p + i = adresse contenue dans p + i*taille(élément pointé par p)
-	c = pool->head + index;
+	c = pool->head + pool->index;
+	c->val = val;
 	pool->index++;
 
 #if NON_BLOCKING == 0
@@ -140,10 +143,10 @@ cell_t* stack_pop(stack_t* s, int thread_id) {
 
 	stack_t* pool = &pool_array[thread_id];
 	// pop head means giving it back to the pool
+	old->val = 0;
+	old->next = NULL;
 	pool->index--;
-	// todo : joublie quoi ??
 
-	}
 
   return old;
 
