@@ -45,12 +45,14 @@
 #endif
 #endif
 
-#define CHUNK_SIZE 1000
 static stack_t pool_array[NB_THREADS];
 
 void init_pool() {
 	for (int i=0; i < NB_THREADS; ++i ){
 		pool_array[i] = malloc(sizeof(stack_t));
+		pool_array[i]->head = malloc(cell_t * CHUNK_SIZE);
+		pool_array[i]->index = 0;
+		pool_array[i]->next_chunk = NULL;
 	}
 }
 
@@ -77,7 +79,16 @@ int stack_push(stack_t * s, int val, int thread_id)
 
 	// if pool has no more element, reallocate CHUNK
 	if(pool->index == CHUNK_SIZE){
-		pool->head = malloc(cell_t * CHUNK_SIZE);
+		if (pool->next_chunk == NULL){
+			pool->next_chunk = malloc(sizeof(stack_t));
+			pool->next_chunk->head = malloc(cell_t * CHUNK_SIZE);
+			pool->next->index = 0;
+			pool = pool->next_chunk;
+		}
+		else {
+			pool = pool->next_chunk;
+		}
+
 	}
 
 	cell_t* c, old;
@@ -109,9 +120,8 @@ int stack_push(stack_t * s, int val, int thread_id)
 }
 
 cell_t* stack_pop(stack_t* s, int thread_id) {
-  assert(s != NULL);
+  assert(s != NULL && thread_id >= 0);
 	cell_t* old;
-
 #if NON_BLOCKING == 0
   // Implement a lock_based stack
   pthread_mutex_lock(&mtx);
@@ -127,6 +137,13 @@ cell_t* stack_pop(stack_t* s, int thread_id) {
 			newHead = s->head->next;
 	} while(cas(((size_t*)&(s->head)), ((size_t)(old)), ((size_t)newHead)) != (size_t)old);
 	#endif
+
+	stack_t* pool = &pool_array[thread_id];
+	// pop head means giving it back to the pool
+	pool->index--;
+	// todo : joublie quoi ??
+
+	}
 
   return old;
 

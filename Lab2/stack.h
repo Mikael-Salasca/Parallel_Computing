@@ -38,6 +38,7 @@ struct stack
 {
   cell_t * head;
   int index;
+  stack_t * next_chunk;
 
 };
 typedef struct stack stack_t;
