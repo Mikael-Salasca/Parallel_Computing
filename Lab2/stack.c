@@ -81,7 +81,8 @@ stack_check(stack_t *stack)
 
 int stack_push(stack_t * s, int val, int thread_id)
 {
-	assert(s != NULL && thread_id >= 0);
+	assert(s != NULL);
+	assert(thread_id >= 0);
 
 	stack_t* pool = pool_array[thread_id];
 
@@ -132,7 +133,10 @@ int stack_push(stack_t * s, int val, int thread_id)
 }
 
 cell_t* stack_pop(stack_t* s, int thread_id) {
-  assert(s != NULL && thread_id >= 0); //&& !(pool_array[thread_id].index == 0 & pool_array[thread_id].next_chunk == NULL));
+  assert(s != NULL);
+	assert(s->head != NULL);
+	assert(thread_id >= 0);
+
 	cell_t* old;
 #if NON_BLOCKING == 0
   // Implement a lock_based stack
@@ -152,7 +156,7 @@ cell_t* stack_pop(stack_t* s, int thread_id) {
 
 	// pop head means giving it back to the pool
 	stack_t* pool;
-	
+
 	if (pool_array[thread_id]->index == 0){
 		stack_t* old_chunk = pool_array[thread_id];
 		pool_array[thread_id] = pool_array[thread_id]->next_chunk;
