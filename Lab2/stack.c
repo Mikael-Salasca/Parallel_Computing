@@ -77,19 +77,19 @@ int stack_push(stack_t * s, int val, int thread_id)
 
 	stack_t* pool = &pool_array[thread_id];
 
-	// if pool has no more element, reallocate CHUNK
-	if(pool->index == CHUNK_SIZE){
+	// if pool has no more element, reallocate CHUNK, iterates !!
+	while(pool->index == CHUNK_SIZE){
+
 		if (pool->next_chunk == NULL){
 			pool->next_chunk = malloc(sizeof(stack_t));
 			pool->next_chunk->head = malloc(sizeof(cell_t) * CHUNK_SIZE);
 			pool->next_chunk->index = 0;
-			pool = pool->next_chunk;
-		}
-		else {
-			pool = pool->next_chunk;
 		}
 
-	}
+		pool = pool->next_chunk;
+
+
+	} // end while
 
 	cell_t* c;
 	cell_t* old;

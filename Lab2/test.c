@@ -143,7 +143,7 @@ test_setup()
   pthread_mutex_init(&mtx, NULL);
   init_pool();
   // pops needs some element
-  #if MEASURE == 1
+  #if MEASURE >= 1
   for(int i=0; i < NB_THREADS; ++i){
     for (int j=0; j < MAX_PUSH_POP/NB_THREADS; ++j){
       stack_push(stack,j,i);
