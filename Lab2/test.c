@@ -131,7 +131,9 @@ stack_measure_push(void* arg)
 
 /* A bunch of optional (but useful if implemented) unit tests for your stack */
 void
-test_init() {}
+test_init() {
+  init_pool();
+}
 
 void
 test_setup()
@@ -141,16 +143,15 @@ test_setup()
   stack = malloc(sizeof(stack_t));
   stack->head =NULL;
   pthread_mutex_init(&mtx, NULL);
-  init_pool();
+
+
   // pops needs some element
-  #if MEASURE >= 1
-  for(int i=0; i < NB_THREADS; ++i){
-    for (int j=0; j < MAX_PUSH_POP/NB_THREADS; ++j){
-      stack_push(stack,j,i);
+  #if MEASURE == 1
+    for(int i=0; i < NB_THREADS; ++i){
+      for (int j=0; j < MAX_PUSH_POP/NB_THREADS; ++j){
+        stack_push(stack,j,i);
+      }
     }
-  }
-
-
   #endif
 
 
@@ -166,7 +167,9 @@ test_teardown()
 }
 
 void
-test_finalize() {}
+test_finalize() {
+  free_pool();
+}
 
 int
 test_push_safe()
@@ -424,12 +427,16 @@ main(int argc, char **argv)
 setbuf(stdout, NULL);
 // MEASURE == 0 : Unit tests
 #if MEASURE == 0
+  test_init();
   test_run(test_cas);
   test_run(test_push_safe);
   test_run(test_pop_safe);
   test_run(test_aba);
+  test_finalize();
 #else // MEASURING
+  test_init();
   test_setup();
+
   int i;
   pthread_t thread[NB_THREADS];
   pthread_attr_t attr;
@@ -459,6 +466,7 @@ setbuf(stdout, NULL);
         printf("Thread %d time: %f\n", i, timediff(&t_start[i], &t_stop[i]));
     }
     test_teardown();
+    test_finalize();
 #endif
 
   return 0;

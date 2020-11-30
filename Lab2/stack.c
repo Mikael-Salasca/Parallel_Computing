@@ -57,6 +57,13 @@ void init_pool() {
 	}
 }
 
+void free_pool(){
+	for (int i=0; i < NB_THREADS; ++i ){
+			free(pool_array[i]->head);
+			free(pool_array[i]);
+	}
+}
+
 int
 stack_check(stack_t *stack)
 {
@@ -87,6 +94,7 @@ int stack_push(stack_t * s, int val, int thread_id)
 		new_chunk->head = malloc(sizeof(cell_t) * CHUNK_SIZE);
 		new_chunk->index = 0;
 		new_chunk->next_chunk = pool;
+		pool_array[thread_id] = new_chunk;
 		pool = new_chunk;
 	} // end while
 
@@ -113,11 +121,13 @@ int stack_push(stack_t * s, int val, int thread_id)
 			c->next = old;
 		} while(cas(((size_t*)&(s->head)), ((size_t)(old)), ((size_t)c)) != (size_t)old);
 
+#endif
+
+
   // Debug practice: you can check if this operation results in a stack in a consistent check
   // It doesn't harm performance as sanity check are disabled at measurement time
   // This is to be updated as your implementation progresses
   stack_check((stack_t*)1);
-	#endif
   return 0;
 }
 
@@ -140,18 +150,16 @@ cell_t* stack_pop(stack_t* s, int thread_id) {
 	} while(cas(((size_t*)&(s->head)), ((size_t)(old)), ((size_t)newHead)) != (size_t)old);
 	#endif
 
-	stack_t* pool = pool_array[thread_id];
 	// pop head means giving it back to the pool
-	// old = s->head;
-	// s->head = s->head->next;
-	// free(old)
-
-	if (pool->index == 0){
-		stack_t* old_chunk = pool;
-		pool = pool->next_chunk;
+	stack_t* pool;
+	
+	if (pool_array[thread_id]->index == 0){
+		stack_t* old_chunk = pool_array[thread_id];
+		pool_array[thread_id] = pool_array[thread_id]->next_chunk;
 		free(old_chunk->head);
+		free(old_chunk);
 	}
-
+	pool = pool_array[thread_id];
 	old->val = 0;
 	old->next = NULL;
 	pool->index--;

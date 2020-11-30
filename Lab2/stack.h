@@ -32,18 +32,18 @@ struct cell
   int val;
   struct cell * next;
 };
-typedef struct cell cell_t;
+typedef struct cell cell_t; // 16 bytes
 
 struct stack
 {
   cell_t * head;
   int index;
   struct stack * next_chunk;
-
 };
-typedef struct stack stack_t;
+typedef struct stack stack_t; //24
 
 void init_pool();
+void free_pool();
 
 int stack_push(stack_t * s, int val, int thread_id);
 cell_t* stack_pop(stack_t* s, int thread_id);
