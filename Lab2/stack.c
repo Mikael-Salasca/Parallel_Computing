@@ -46,13 +46,14 @@
 #endif
 
 #define CHUNK_SIZE 1000
-static stack_t pool_array[NB_THREADS];
+static stack_t* pool_array[NB_THREADS];
 
 void init_pool() {
 	for (int i=0; i < NB_THREADS; ++i ){
-		pool_array[i].head = malloc(sizeof(cell_t) * CHUNK_SIZE);
-		pool_array[i].index = 0;
-		pool_array[i].next_chunk = NULL;
+		pool_array[i] = malloc(sizeof(stack_t));
+		pool_array[i]->head = malloc(sizeof(cell_t) * CHUNK_SIZE);
+		pool_array[i]->index = 0;
+		pool_array[i]->next_chunk = NULL;
 	}
 }
 
@@ -75,20 +76,18 @@ int stack_push(stack_t * s, int val, int thread_id)
 {
 	assert(s != NULL && thread_id >= 0);
 
-	stack_t* pool = &pool_array[thread_id];
+	stack_t* pool = pool_array[thread_id];
 
-	// if pool has no more element, reallocate CHUNK, iterates !!
-	while(pool->index == CHUNK_SIZE){
+	// if pool has no more element, reallocate CHUNK
+	// c->next = s->head;
+  // s->head = c;
 
-		if (pool->next_chunk == NULL){
-			pool->next_chunk = malloc(sizeof(stack_t));
-			pool->next_chunk->head = malloc(sizeof(cell_t) * CHUNK_SIZE);
-			pool->next_chunk->index = 0;
-		}
-
-		pool = pool->next_chunk;
-
-
+	if(pool->index == CHUNK_SIZE){
+		stack_t *new_chunk = malloc(sizeof(stack_t));
+		new_chunk->head = malloc(sizeof(cell_t) * CHUNK_SIZE);
+		new_chunk->index = 0;
+		new_chunk->next_chunk = pool;
+		pool = new_chunk;
 	} // end while
 
 	cell_t* c;
@@ -123,7 +122,7 @@ int stack_push(stack_t * s, int val, int thread_id)
 }
 
 cell_t* stack_pop(stack_t* s, int thread_id) {
-  assert(s != NULL && thread_id >= 0);
+  assert(s != NULL && thread_id >= 0); //&& !(pool_array[thread_id].index == 0 & pool_array[thread_id].next_chunk == NULL));
 	cell_t* old;
 #if NON_BLOCKING == 0
   // Implement a lock_based stack
@@ -141,8 +140,18 @@ cell_t* stack_pop(stack_t* s, int thread_id) {
 	} while(cas(((size_t*)&(s->head)), ((size_t)(old)), ((size_t)newHead)) != (size_t)old);
 	#endif
 
-	stack_t* pool = &pool_array[thread_id];
+	stack_t* pool = pool_array[thread_id];
 	// pop head means giving it back to the pool
+	// old = s->head;
+	// s->head = s->head->next;
+	// free(old)
+
+	if (pool->index == 0){
+		stack_t* old_chunk = pool;
+		pool = pool->next_chunk;
+		free(old_chunk->head);
+	}
+
 	old->val = 0;
 	old->next = NULL;
 	pool->index--;
