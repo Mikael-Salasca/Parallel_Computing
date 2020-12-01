@@ -85,7 +85,7 @@ enum {
 
 static unsigned char average_kernel(skepu_region2d_unsigned__space__char m, unsigned long elemPerPx)
 {
-	float scaling = 1.0 / ((m.oj/elemPerPx*2+1)*(m.oi*2+1));
+	float scaling = 1.0 / ((m.oj/elemPerPx*2+1)*(m.oi*2+1)); // oj -> x radius, oi -> y radius [2 - 50]
 	float res = 0;
 	for (int y = -m.oi; y <= m.oi; ++y)
 		for (int x = -m.oj; x <= m.oj; x += elemPerPx)

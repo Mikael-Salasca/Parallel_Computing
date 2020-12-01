@@ -28,17 +28,9 @@ unsigned char average_kernel(skepu::Region2D<unsigned char> m, size_t elemPerPx)
 
 unsigned char average_kernel_1d(skepu::Region1D<unsigned char> m, size_t elemPerPx)
 {
-	// 	Averaging filters have a property known as separability. This means that the two-dimensional
-	// filtering operation can be separated into two one-dimensional filters instead 2 SkePU also
-	// supports one-dimensional MapOverlaps over matrices, so your task is to reimplement the
-	// averaging filter in this way. The source file already has a few starting points to help you
-	// out.
-	// Note: The edge pixels of the output will not be exactly the same because of differences
-	// in the edge handling. The "safe" region (inset by the filter radius from the edge) should be
-	// identical, however
 	float scaling = 1.0 / ((m.oi/elemPerPx*2+1)); // oj -> x radius, oi -> y radius [2 - 50]
 	float res = 0;
-		for (int x = -m.oj; x <= m.oj; x += elemPerPx)
+		for (int x = -m.oi; x <= m.oi; x += elemPerPx)
 			res += m(x);
 	return res * scaling;
 }
@@ -48,9 +40,9 @@ unsigned char average_kernel_1d(skepu::Region1D<unsigned char> m, size_t elemPer
 unsigned char gaussian_kernel(skepu::Region1D<unsigned char> m, const skepu::Vec<float> stencil, size_t elemPerPx)
 {
 	float res = 0;
-	int stencilCounter = 0;
-	for (int x = -m.oi; x <= m.oi; x += elemPerPx) {
-		res += m(x) * stencil(stencilCounter++);
+	int stencil_cpt = 0;
+	for (int x = -m.oi; x <= m.oi; x += elemPerPx){
+		res += m(x) * stencil(stencil_cpt++);
 	}
 	return res;
 }
@@ -84,6 +76,11 @@ int main(int argc, char* argv[])
 	skepu::Matrix<unsigned char> inputMatrixPad = ReadAndPadPngFileToMatrix(inputFileName, radius, colorType, imageInfo);
 	skepu::Matrix<unsigned char> inputMatrix = ReadPngFileToMatrix(inputFileName, colorType, imageInfo);
 	skepu::Matrix<unsigned char> outputMatrix(imageInfo.height, imageInfo.width * imageInfo.elementsPerPixel, 120);
+	skepu::Matrix<unsigned char> tmp(imageInfo.height, imageInfo.width * imageInfo.elementsPerPixel, 120);
+	skepu::Matrix<unsigned char> outputMatrixSep(imageInfo.height, imageInfo.width * imageInfo.elementsPerPixel, 120);
+	skepu::Matrix<unsigned char> outputMatrixGauss(imageInfo.height, imageInfo.width * imageInfo.elementsPerPixel, 120);
+
+
 	// more containers...?
 
 	// Original version
@@ -107,13 +104,16 @@ int main(int argc, char* argv[])
 	{
 		auto conv = skepu::MapOverlap(average_kernel_1d);
 		conv.setOverlapMode(skepu::Overlap::ColWise);
-		conv.setOverlap(radius*imageInfo.elementsPerPixel)
+		conv.setOverlap(radius*imageInfo.elementsPerPixel);
 		auto timeTaken = skepu::benchmark::measureExecTime([&]
 		{
-			conv(outputMatrix, inputMatrixPad, imageInfo.elementsPerPixel);
+			conv(tmp, inputMatrix, imageInfo.elementsPerPixel);
+			conv.setOverlapMode(skepu::Overlap::RowWise);
+			conv.setOverlap(radius);
+			conv(outputMatrixSep, tmp, 1);
 		});
 
-	//	WritePngFileMatrix(outputMatrix, outputFile + "-separable.png", colorType, imageInfo);
+		WritePngFileMatrix(outputMatrix, outputFile + "-separable.png", colorType, imageInfo);
 		std::cout << "Time for separable: " << (timeTaken.count() / 10E6) << "\n";
 	}
 
@@ -123,13 +123,19 @@ int main(int argc, char* argv[])
 		skepu::Vector<float> stencil = sampleGaussian(radius);
 
 		// skeleton instance, etc here (remember to set backend)
+		auto conv = skepu::MapOverlap(gaussian_kernel);
+		conv.setOverlapMode(skepu::Overlap::RowWise);
+		conv.setOverlap(radius  * imageInfo.elementsPerPixel);
 
 		auto timeTaken = skepu::benchmark::measureExecTime([&]
 		{
-			// your code here
+			conv(outputMatrixGauss, inputMatrix, stencil, imageInfo.elementsPerPixel);
+			conv.setOverlapMode(skepu::Overlap::ColWise);
+			conv.setOverlap(radius);
+			conv(outputMatrix, outputMatrixGauss, stencil, 1);
 		});
 
-	//	WritePngFileMatrix(outputMatrix, outputFile + "-gaussian.png", colorType, imageInfo);
+		WritePngFileMatrix(outputMatrix, outputFile + "-gaussian.png", colorType, imageInfo);
 		std::cout << "Time for gaussian: " << (timeTaken.count() / 10E6) << "\n";
 	}
 
