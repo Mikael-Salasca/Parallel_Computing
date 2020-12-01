@@ -134,6 +134,12 @@ int stack_push(stack_t * s, int val, int thread_id)
 
 cell_t* stack_pop(stack_t* s, int thread_id) {
   assert(s != NULL);
+	// if (s->head == NULL){
+	// 	printf("%pool->head : %p\n", pool_array[thread_id]->head );
+	// 	printf("%pool->index : %d\n", pool_array[thread_id]->index );
+	// 	printf("%pool->next : %p\n", pool_array[thread_id]->next_chunk );
+	//
+	// }
 	assert(s->head != NULL);
 	assert(thread_id >= 0);
 
@@ -143,6 +149,7 @@ cell_t* stack_pop(stack_t* s, int thread_id) {
   pthread_mutex_lock(&mtx);
 	old = s->head;
   s->head = s->head->next;
+	// printf("popped : %d by t%d\n",old->val,thread_id);
   pthread_mutex_unlock(&mtx);
 
 #elif NON_BLOCKING == 1
@@ -163,10 +170,9 @@ cell_t* stack_pop(stack_t* s, int thread_id) {
 		free(old_chunk->head);
 		free(old_chunk);
 	}
-	pool = pool_array[thread_id];
-	old->val = 0;
-	old->next = NULL;
-	pool->index--;
+	// old->val = 0;
+	// old->next = NULL;
+	pool_array[thread_id]->index--;
 
 
   return old;

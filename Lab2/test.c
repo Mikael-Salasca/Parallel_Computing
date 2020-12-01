@@ -83,7 +83,7 @@ assert_fun(int expr, const char *str, const char *file, const char* function, si
 }
 #endif
 
-stack_t *stack;
+static stack_t *stack;
 data_t data;
 
 #if MEASURE != 0
@@ -145,10 +145,10 @@ test_setup()
   pthread_mutex_init(&mtx, NULL);
 
 
-  // pops needs some element
+  // 1 THREAD CANNOT POPS MORE THANT HE PUSHES 
   #if MEASURE == 1
     for(int i=0; i < NB_THREADS; ++i){
-      for (int j=0; j < MAX_PUSH_POP/NB_THREADS; ++j){
+      for (int j=0; j < MAX_PUSH_POP ; j++){
         stack_push(stack,j,i);
       }
     }
