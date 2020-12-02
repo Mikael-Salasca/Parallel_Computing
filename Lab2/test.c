@@ -83,7 +83,7 @@ assert_fun(int expr, const char *str, const char *file, const char* function, si
 }
 #endif
 
-static stack_t *stack;
+stack_t *stack;
 data_t data;
 
 #if MEASURE != 0
