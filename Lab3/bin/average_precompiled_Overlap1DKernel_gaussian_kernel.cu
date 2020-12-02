@@ -71,7 +71,7 @@ __global__ void average_precompiled_Overlap1DKernel_gaussian_kernel_MapOverlapKe
 
       //Compute and store data
       if( (i >= out_offset) && (i < out_offset+out_numelements) )
-      	 output[i-out_offset] = skepu_userfunction_skepu_skel_1conv_gaussian_kernel::CU({(int)overlap, 1, &sdata[tid + overlap]} , stencil, elemPerPx);
+      	 output[i-out_offset] = skepu_userfunction_skepu_skel_0conv_gaussian_kernel::CU({(int)overlap, 1, &sdata[tid + overlap]} , stencil, elemPerPx);
 
       i += gridSize;
 
@@ -156,7 +156,7 @@ __global__ void average_precompiled_Overlap1DKernel_gaussian_kernel_MapOverlapKe
 
    //Compute and store data
    if( (i >= out_offset) && (i < out_offset+out_numelements) )
-   	output[i-out_offset] = skepu_userfunction_skepu_skel_1conv_gaussian_kernel::CU({(int)overlap, 1, &sdata[tid + overlap]} , stencil, elemPerPx);
+   	output[i-out_offset] = skepu_userfunction_skepu_skel_0conv_gaussian_kernel::CU({(int)overlap, 1, &sdata[tid + overlap]} , stencil, elemPerPx);
 }
 
 __global__ void average_precompiled_Overlap1DKernel_gaussian_kernel_MapOverlapKernel_CU_Matrix_Col(
@@ -238,7 +238,7 @@ __global__ void average_precompiled_Overlap1DKernel_gaussian_kernel_MapOverlapKe
    //Compute and store data
    if( (arrInd >= out_offset) && (arrInd < out_offset+out_numelements) )
    {
-      output[arrInd-out_offset] = skepu_userfunction_skepu_skel_1conv_gaussian_kernel::CU({(int)overlap, 1, &sdata[tid + overlap]} , stencil, elemPerPx);
+      output[arrInd-out_offset] = skepu_userfunction_skepu_skel_0conv_gaussian_kernel::CU({(int)overlap, 1, &sdata[tid + overlap]} , stencil, elemPerPx);
    }
 }
 
@@ -389,6 +389,6 @@ __global__ void average_precompiled_Overlap1DKernel_gaussian_kernel_MapOverlapKe
    //Compute and store data
    if( arrInd < out_numelements )
    {
-      output[arrInd] = skepu_userfunction_skepu_skel_1conv_gaussian_kernel::CU({(int)overlap, 1, &sdata[tid + overlap]} , stencil, elemPerPx);
+      output[arrInd] = skepu_userfunction_skepu_skel_0conv_gaussian_kernel::CU({(int)overlap, 1, &sdata[tid + overlap]} , stencil, elemPerPx);
    }
 }

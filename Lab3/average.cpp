@@ -43,7 +43,7 @@ unsigned char gaussian_kernel(skepu::Region1D<unsigned char> m, const skepu::Vec
 	int stencil_cpt = 0;
 	for (int x = -m.oi; x <= m.oi; x += elemPerPx)
 		res += m(x) * stencil(stencil_cpt++);
-	
+
 	return res;
 }
 
@@ -103,12 +103,12 @@ int main(int argc, char* argv[])
 	// and conv.setOverlap(<integer>)
 	{
 		auto conv = skepu::MapOverlap(average_kernel_1d);
-		conv.setOverlapMode(skepu::Overlap::ColWise);
+		conv.setOverlapMode(skepu::Overlap::RowWise);
 		conv.setOverlap(radius*imageInfo.elementsPerPixel);
 		auto timeTaken = skepu::benchmark::measureExecTime([&]
 		{
 			conv(tmp, inputMatrix, imageInfo.elementsPerPixel);
-			conv.setOverlapMode(skepu::Overlap::RowWise);
+			conv.setOverlapMode(skepu::Overlap::ColWise);
 			conv.setOverlap(radius);
 			conv(outputMatrixSep, tmp, 1);
 		});

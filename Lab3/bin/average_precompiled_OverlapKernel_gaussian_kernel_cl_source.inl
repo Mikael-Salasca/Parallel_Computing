@@ -103,9 +103,9 @@ static unsigned char gaussian_kernel(skepu_region1d_unsigned__space__char m, ske
 {
 	float res = 0;
 	int stencil_cpt = 0;
-	for (int x = -m.oi; x <= m.oi; x += elemPerPx){
+	for (int x = -m.oi; x <= m.oi; x += elemPerPx)
 		res += skepu_region_access_1d_unsigned__space__char(m,x) * skepu_vec_proxy_access_float(stencil,stencil_cpt++);
-	}
+
 	return res;
 }
 
