@@ -42,11 +42,11 @@ struct stack
 };
 typedef struct stack stack_t; //24
 
-void init_pool();
-void free_pool();
+void init_free_list_array();
+void free_free_list_array();
 
 int stack_push(stack_t * s, int val, int thread_id);
-cell_t* stack_pop(stack_t* s, int thread_id);
+int stack_pop(stack_t* s, int thread_id);
 
 pthread_mutex_t mtx;
 

@@ -132,7 +132,7 @@ stack_measure_push(void* arg)
 /* A bunch of optional (but useful if implemented) unit tests for your stack */
 void
 test_init() {
-  init_pool();
+  init_free_list_array();
 }
 
 void
@@ -145,7 +145,7 @@ test_setup()
   pthread_mutex_init(&mtx, NULL);
 
 
-  // 1 THREAD CANNOT POPS MORE THANT HE PUSHES 
+  // 1 THREAD CANNOT POPS MORE THANT HE PUSHES
   #if MEASURE == 1
     for(int i=0; i < NB_THREADS; ++i){
       for (int j=0; j < MAX_PUSH_POP ; j++){
@@ -168,7 +168,7 @@ test_teardown()
 
 void
 test_finalize() {
-  free_pool();
+  free_free_list_array();
 }
 
 int

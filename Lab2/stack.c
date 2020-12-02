@@ -46,21 +46,33 @@
 #endif
 
 #define CHUNK_SIZE 1000
-static stack_t* pool_array[NB_THREADS];
+static stack_t* free_list_array[NB_THREADS];
+static stack_t* chunks_to_free;
 
-void init_pool() {
+void init_free_list_array() {
 	for (int i=0; i < NB_THREADS; ++i ){
-		pool_array[i] = malloc(sizeof(stack_t));
-		pool_array[i]->head = malloc(sizeof(cell_t) * CHUNK_SIZE);
-		pool_array[i]->index = 0;
-		pool_array[i]->next_chunk = NULL;
+		free_list_array[i] = malloc(sizeof(stack_t));
+		free_list_array[i]->head = malloc(sizeof(cell_t) * CHUNK_SIZE);
+		// link all the cells in the chunk
+		for (int j=0; j < CHUNK_SIZE; ++j) {
+			((cell_t *) free_list_array[i]->head + (j+1) )->next = (cell_t *) free_list_array[i]->head + j;
+		}
 	}
 }
 
-void free_pool(){
+void free_free_list_array(){
 	for (int i=0; i < NB_THREADS; ++i ){
-			free(pool_array[i]->head);
-			free(pool_array[i]);
+			free(free_list_array[i]->head);
+			free(free_list_array[i]);
+
+			stack_t* curr = chunks_to_free;
+			while (curr != NULL){
+				stack_t* tmp = curr;
+				curr = curr->next_chunk;
+				free(tmp->head);
+				free(tmp);
+			}
+
 	}
 }
 
@@ -84,28 +96,27 @@ int stack_push(stack_t * s, int val, int thread_id)
 	assert(s != NULL);
 	assert(thread_id >= 0);
 
-	stack_t* pool = pool_array[thread_id];
 
-	// if pool has no more element, reallocate CHUNK
-	// c->next = s->head;
-  // s->head = c;
+	// if free_list is empty (ie all cells are used), reallocate CHUNK
+	if(free_list_array[thread_id]->head == NULL){
+		// push the chunck to free_chunks
+		free_list_array[thread_id]->next_chunk = chunks_to_free;
+		chunks_to_free = free_list_array[thread_id];
 
-	if(pool->index == CHUNK_SIZE){
-		stack_t *new_chunk = malloc(sizeof(stack_t));
-		new_chunk->head = malloc(sizeof(cell_t) * CHUNK_SIZE);
-		new_chunk->index = 0;
-		new_chunk->next_chunk = pool;
-		pool_array[thread_id] = new_chunk;
-		pool = new_chunk;
+		free_list_array[thread_id] = malloc(sizeof(stack_t));
+		free_list_array[thread_id]->head = malloc(sizeof(cell_t) * CHUNK_SIZE);
+		for (int j=0; j + 1 < CHUNK_SIZE; ++j) {
+			((cell_t *) (free_list_array[thread_id]->head + j))->next = ((cell_t *) (free_list_array[thread_id]->head + (j+1)));
+		}
+
 	} // end while
 
+	stack_t* free_list = free_list_array[thread_id];
 	cell_t* c;
-	cell_t* old;
-
-	//p + i = adresse contenue dans p + i*taille(élément pointé par p)
-	c = pool->head + pool->index;
+	// pops from free list
+	c = free_list->head;
+	free_list->head = free_list->head->next;
 	c->val = val;
-	pool->index++;
 
 #if NON_BLOCKING == 0
   // Implement a lock_based stack
@@ -132,12 +143,12 @@ int stack_push(stack_t * s, int val, int thread_id)
   return 0;
 }
 
-cell_t* stack_pop(stack_t* s, int thread_id) {
+int stack_pop(stack_t* s, int thread_id) {
   assert(s != NULL);
 	// if (s->head == NULL){
-	// 	printf("%pool->head : %p\n", pool_array[thread_id]->head );
-	// 	printf("%pool->index : %d\n", pool_array[thread_id]->index );
-	// 	printf("%pool->next : %p\n", pool_array[thread_id]->next_chunk );
+	// 	printf("%free_list->head : %p\n", free_list_array[thread_id]->head );
+	// 	printf("%free_list->index : %d\n", free_list_array[thread_id]->index );
+	// 	printf("%free_list->next : %p\n", free_list_array[thread_id]->next_chunk );
 	//
 	// }
 	assert(s->head != NULL);
@@ -161,21 +172,13 @@ cell_t* stack_pop(stack_t* s, int thread_id) {
 	} while(cas(((size_t*)&(s->head)), ((size_t)(old)), ((size_t)newHead)) != (size_t)old);
 	#endif
 
-	// pop head means giving it back to the pool
-	stack_t* pool;
-
-	if (pool_array[thread_id]->index == 0){
-		stack_t* old_chunk = pool_array[thread_id];
-		pool_array[thread_id] = pool_array[thread_id]->next_chunk;
-		free(old_chunk->head);
-		free(old_chunk);
-	}
-	// old->val = 0;
-	// old->next = NULL;
-	pool_array[thread_id]->index--;
+	// pop from shared stack means pushes it to the free_list of the thread
+	old->next = free_list_array[thread_id]->head;
+	free_list_array[thread_id]->head = old;
 
 
-  return old;
+
+  return 0;
 
 }
 

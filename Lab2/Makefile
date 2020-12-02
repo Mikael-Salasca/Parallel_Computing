@@ -20,13 +20,13 @@ clean:
 	$(RM) stack
 	$(RM) stack-*
 	$(RM) *.o
-	
+
 $(OUT): test.c stack$(STACK_SUFFIX).o nonblocking$(NON_BLOCKING_SUFFIX).o
 	gcc $(CFLAGS) stack$(STACK_SUFFIX).o non_blocking$(NON_BLOCKING_SUFFIX).o test.c -o $(OUT)
 
 stack$(STACK_SUFFIX).o: stack.c stack.h
 	gcc $(CFLAGS) -c -o stack$(STACK_SUFFIX).o stack.c
-	
+
 nonblocking$(NON_BLOCKING_SUFFIX).o: non_blocking.c
 	gcc $(CFLAGS) -c -o non_blocking$(NON_BLOCKING_SUFFIX).o non_blocking.c
 
