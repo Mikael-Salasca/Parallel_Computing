@@ -41,9 +41,9 @@ unsigned char gaussian_kernel(skepu::Region1D<unsigned char> m, const skepu::Vec
 {
 	float res = 0;
 	int stencil_cpt = 0;
-	for (int x = -m.oi; x <= m.oi; x += elemPerPx){
+	for (int x = -m.oi; x <= m.oi; x += elemPerPx)
 		res += m(x) * stencil(stencil_cpt++);
-	}
+	
 	return res;
 }
 
