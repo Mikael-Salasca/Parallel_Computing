@@ -132,7 +132,7 @@ stack_measure_push(void* arg)
 /* A bunch of optional (but useful if implemented) unit tests for your stack */
 void
 test_init() {
-  init_free_list_array();
+  init_free_list();
 }
 
 void
@@ -168,7 +168,7 @@ test_teardown()
 
 void
 test_finalize() {
-  free_free_list_array();
+  free_free_list();
 }
 
 int

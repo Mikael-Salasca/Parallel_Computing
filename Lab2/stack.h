@@ -42,8 +42,8 @@ struct stack
 };
 typedef struct stack stack_t; //24
 
-void init_free_list_array();
-void free_free_list_array();
+void init_free_list();
+void free_free_list();
 
 int stack_push(stack_t * s, int val, int thread_id);
 int stack_pop(stack_t* s, int thread_id);

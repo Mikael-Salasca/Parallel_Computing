@@ -46,27 +46,35 @@
 #endif
 
 #define CHUNK_SIZE 1000
-#define MAX_CHUNK 5000
 
+static stack_t free_list[NB_THREADS]; // one free_list per thread
+static stack_t* chunks[NB_THREADS]; // keep track on each chunks of each thread
 
-static stack_t free_list_array[NB_THREADS];
-static stack_t* chunks_to_free[MAX_CHUNK];
-static nb_to_free = 0;
-
-void init_free_list_array() {
+void init_free_list() {
 	for (int i=0; i < NB_THREADS; ++i ){
-		free_list_array[i].head = malloc(sizeof(cell_t) * CHUNK_SIZE);
+		// allocate the chunk
+		free_list[i].head = malloc(sizeof(cell_t) * CHUNK_SIZE);
+		chunks[i] = malloc(sizeof(stack_t));
+		chunks[i]->head = free_list[i].head;
+
 		// link all the cells in the chunk
 		for (int j=0; j < CHUNK_SIZE; ++j) {
-			((cell_t *) free_list_array[i].head + j )->next = (cell_t *) free_list_array[i].head + j+1;
+			((cell_t *) free_list[i].head + j )->next = (cell_t *) free_list[i].head + j+1;
 		}
-		((cell_t *) (free_list_array[i].head + CHUNK_SIZE - 1))->next = NULL;
-
+		((cell_t *) (free_list[i].head + CHUNK_SIZE - 1))->next = NULL;
 	}
 }
 
-void free_free_list_array(){
-	// TODO - FIX LEAKS + UNIT TESTS
+void free_free_list(){
+	for (int i=0; i < NB_THREADS; ++i){
+		stack_t* curr = chunks[i];
+		while (curr != NULL){
+			stack_t *old = curr;
+			curr = curr->next_chunk;
+			free(old->head);
+			free(old);
+		}
+	}
 }
 
 int
@@ -91,30 +99,30 @@ int stack_push(stack_t * s, int val, int thread_id)
 
 
 	// if free_list is empty (ie all cells are used), reallocate CHUNK
-	if(free_list_array[thread_id].head == NULL){
-		// push the chunk to free_chunks
-		chunks_to_free[nb_to_free++] = &free_list_array[thread_id];
+	if(free_list[thread_id].head == NULL){
 
 		// allocate new chunk
-		free_list_array[thread_id].head = malloc(sizeof(cell_t) * CHUNK_SIZE);
-		
+		free_list[thread_id].head = malloc(sizeof(cell_t) * CHUNK_SIZE);
+		stack_t * tmp = malloc(sizeof(stack_t));
+		tmp->head = free_list[thread_id].head;
+		tmp->next_chunk = chunks[thread_id];
+		chunks[thread_id] = tmp;
+
 		// link all the cells
 		for (int j=0; j + 1 < CHUNK_SIZE; ++j) {
-			((cell_t *) (free_list_array[thread_id].head + j))->next = ((cell_t *) (free_list_array[thread_id].head + (j+1)));
+			((cell_t *) (free_list[thread_id].head + j))->next = ((cell_t *) (free_list[thread_id].head + (j+1)));
 		}
-		((cell_t *) (free_list_array[thread_id].head + CHUNK_SIZE - 1))->next = NULL;
+		((cell_t *) (free_list[thread_id].head + CHUNK_SIZE - 1))->next = NULL;
 
 
 	} // end if
 
-	stack_t* free_list = &free_list_array[thread_id];
+	stack_t* fl = &free_list[thread_id];
 	cell_t* c;
 	cell_t* tmp;
 	// pops from free list
-	// old = s->head;
-	// c->next = old;
-	tmp = free_list->head;
-	free_list->head = free_list->head->next;
+	tmp = fl->head;
+	fl->head = fl->head->next;
 	c = tmp;
 	c->val = val;
 
@@ -128,6 +136,7 @@ int stack_push(stack_t * s, int val, int thread_id)
 
 #elif NON_BLOCKING == 1
   // Implement a harware CAS-based stack
+	cell_t * old;
 		do {
 			old = s->head;
 			c->next = old;
@@ -145,12 +154,6 @@ int stack_push(stack_t * s, int val, int thread_id)
 
 int stack_pop(stack_t* s, int thread_id) {
   assert(s != NULL);
-	// if (s->head == NULL){
-	// 	printf("%free_list->head : %p\n", free_list_array[thread_id].head );
-	// 	printf("%free_list->index : %d\n", free_list_array[thread_id].index );
-	// 	printf("%free_list->next : %p\n", free_list_array[thread_id].next_chunk );
-	//
-	// }
 	assert(s->head != NULL);
 	assert(thread_id >= 0);
 
@@ -173,13 +176,8 @@ int stack_pop(stack_t* s, int thread_id) {
 	#endif
 
 	// pop from shared stack means pushes it to the free_list of the thread
-	// c->next = s->head;
-	// s->head = c;
-	old->next = free_list_array[thread_id].head;
-	free_list_array[thread_id].head = old;
-
-
-
+	old->next = free_list[thread_id].head;
+	free_list[thread_id].head = old;
   return 0;
 
 }
