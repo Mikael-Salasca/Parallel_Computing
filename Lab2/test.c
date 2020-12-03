@@ -195,6 +195,7 @@ void mix_push_pop0(int tid){
 void mix_push_pop1(int tid){
   sem_wait(&sem1);
   stack_pop(stack, tid);
+  // pushes cell of thread0's chunk
   stack_push(stack, 2, tid);
 
 }
@@ -214,11 +215,9 @@ test_pop_safe()
   for (int i = 0; i < 2; i++)  {
       pthread_join(threads[i], NULL);
   }
-  printf("DEBUG\n");
 
+  return assert(stack->head->val == 2);
 
-
-  return 0;
 }
 
 // 3 Threads should be enough to raise and detect the ABA problem
