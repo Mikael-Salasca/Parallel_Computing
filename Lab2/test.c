@@ -162,7 +162,6 @@ test_teardown()
 {
   // Do not forget to free your stacks after each test
   // to avoid memory leaks
-  //TODO
   free(stack);
 }
 
@@ -188,13 +187,37 @@ test_push_safe()
   // Now, the test succeeds
   return res; // && assert(stack->change_this_member == 0);
 }
+sem_t sem0, sem1;
+void mix_push_pop0(int tid){
+  stack_push(stack, 1, tid);
+  sem_post(&sem1);
+}
+void mix_push_pop1(int tid){
+  sem_wait(&sem1);
+  stack_pop(stack, tid);
+  stack_push(stack, 2, tid);
 
+}
 int
 test_pop_safe()
 {
   // Same as the test above for parallel pop operation
+  pthread_t threads[2];
 
-  // For now, this test always fails
+  sem_init(&sem0, 0, 0);
+  sem_init(&sem1, 0, 0);
+
+  // threads with their aba function
+  pthread_create(&threads[0], NULL, mix_push_pop0, (void *)0);
+  pthread_create(&threads[1], NULL, mix_push_pop1, (void *)1);
+
+  for (int i = 0; i < 2; i++)  {
+      pthread_join(threads[i], NULL);
+  }
+  printf("DEBUG\n");
+
+
+
   return 0;
 }
 
