@@ -1,24 +1,39 @@
 // Matrix addition, CPU version
-// nvcc matrix_gpu.cu -L /usr/local/cuda/lib -lcudart -o matrix_gpu
+// nvcc matrix_gpu.cu milli.c -L /usr/local/cuda/lib -lcudart -o matrix
 
 #include <stdio.h>
+#include "milli.h"
 
 __global__
-void add_matrix(float *a, float *b, float *c, int N) {
+void add_matrix_gpu(float *a, float *b, float *c, int N) {
 	int i = blockIdx.x * blockDim.x + threadIdx.x;
 	int j = blockIdx.y * blockDim.y + threadIdx.y;
 	int index = i + j*N;
 	c[index] = a[index] + b[index];
 }
 
-#define BLOCK_SIZE 16
-#define N 32
+void add_matrix_cpu(float *a, float *b, float *c, int N) {
+	int index;
+
+	for (int i = 0; i < N; i++)
+		for (int j = 0; j < N; j++)
+		{
+			index = i + j*N;
+			c[index] = a[index] + b[index];
+		}
+}
+
+#define BLOCK_X_SIZE 16
+#define BLOCK_Y_SIZE 16
+
+#define N 8192
 
 
 int main() {
-	float a[N*N];
-	float b[N*N];
-	float c[N*N];
+	float *a = new float[N*N];
+	float *b = new float[N*N];
+	float *c = new float[N*N];
+
 	for (int i = 0; i < N; i++)
 		for (int j = 0; j < N; j++)
 		{
@@ -28,6 +43,7 @@ int main() {
 
 		const int size = N*N*sizeof(float);
 
+		//GPU
 		float *a_gpu;
 		float *b_gpu;
 		float *c_gpu;
@@ -41,10 +57,13 @@ int main() {
 
 		cudaMemcpy(a_gpu,(void*)a, size, cudaMemcpyHostToDevice);
 		cudaMemcpy(b_gpu,(void*)b, size, cudaMemcpyHostToDevice);
-		dim3 dimGrid(N/BLOCK_SIZE, N/BLOCK_SIZE);
-		dim3 dimBlock(BLOCK_SIZE,BLOCK_SIZE);
+
+		dim3 threadsPerBlock(BLOCK_X_SIZE, BLOCK_Y_SIZE); // 16*16, 256 threads
+    dim3 numBlocks(N / threadsPerBlock.x, N / threadsPerBlock.y);
+
 		cudaEventRecord(start_event, 0);
-		add_matrix<<<dimGrid, dimBlock>>>(a_gpu,b_gpu,c_gpu,N);
+
+		add_matrix_gpu<<<numBlocks, threadsPerBlock>>>(a_gpu,b_gpu,c_gpu,N);
 
 		cudaError_t err = cudaGetLastError();
     if (err != cudaSuccess)
@@ -61,18 +80,36 @@ int main() {
 		float time = 0.0;
 	  cudaEventElapsedTime(&time, start_event, later_event);
 
-	for (int i = 0; i < N; i++)
-	{
-		for (int j = 0; j < N; j++)
-		{
-			printf("%0.2f ", c[i+j*N]);
+	for (int i = 0; i < N; i++) {
+		for (int j = 0; j < N; j++)	{
+			// printf("%0.2f ", c[i+j*N]);
 		}
-		printf("\n");
+		// printf("\n");
+	}
+	printf("N: %d \n", N);
+	printf("Block size: %d \n", BLOCK_X_SIZE);
+	printf("Nb blocks: %d \n", N / threadsPerBlock.x);
+	printf("GPU - Elapsed time (ms): %f \n", time);
+
+	// CPU
+	int start = GetMicroseconds();
+	add_matrix_cpu(a, b, c, N);
+	float end = (GetMicroseconds() - (float)start ) / 1000;
+
+	for (int i = 0; i < N; i++)	{
+		for (int j = 0; j < N; j++)	{
+			//printf("%0.2f ", c[i+j*N]);
+		}
+		//printf("\n");
 	}
 
-	printf("done\n");
+	printf("CPU - Elapsed Time (ms): %f\n ", end);
 
-	printf("Elapsed time: %f \n", time/1000);
+	delete[] a;
+	delete[] b;
+	delete[] c;
+
+	printf("done\n");
 
 	return EXIT_SUCCESS;
 
