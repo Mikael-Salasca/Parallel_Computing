@@ -44,9 +44,9 @@ unsigned char average_kernel_1d(skepu::Region1D<unsigned char> m, size_t elemPer
 unsigned char gaussian_kernel(skepu::Region1D<unsigned char> m, const skepu::Vec<float> stencil, size_t elemPerPx)
 {
 	float res = 0;
-	int stencil_cpt = 0;
+	int stencil_index = 0;
 	for (int x = -m.oi; x <= m.oi; x += elemPerPx)
-		res += m(x) * stencil(stencil_cpt++);
+		res += m(x) * stencil(stencil_index++);
 
 	return res;
 }
@@ -82,9 +82,9 @@ constexpr static bool prefersMatrix = 0;
 static inline SKEPU_ATTRIBUTE_FORCE_INLINE __device__ unsigned char CU(skepu::Region1D<unsigned char> m, const skepu::Vec<float> stencil, unsigned long elemPerPx)
 {
 	float res = 0;
-	int stencil_cpt = 0;
+	int stencil_index = 0;
 	for (int x = -m.oi; x <= m.oi; x += elemPerPx)
-		res += m(x) * stencil(stencil_cpt++);
+		res += m(x) * stencil(stencil_index++);
 
 	return res;
 }
@@ -100,9 +100,9 @@ static inline SKEPU_ATTRIBUTE_FORCE_INLINE __device__ unsigned char CU(skepu::Re
 static inline SKEPU_ATTRIBUTE_FORCE_INLINE unsigned char OMP(skepu::Region1D<unsigned char> m, const skepu::Vec<float> stencil, unsigned long elemPerPx)
 {
 	float res = 0;
-	int stencil_cpt = 0;
+	int stencil_index = 0;
 	for (int x = -m.oi; x <= m.oi; x += elemPerPx)
-		res += m(x) * stencil(stencil_cpt++);
+		res += m(x) * stencil(stencil_index++);
 
 	return res;
 }
@@ -118,9 +118,9 @@ static inline SKEPU_ATTRIBUTE_FORCE_INLINE unsigned char OMP(skepu::Region1D<uns
 static inline SKEPU_ATTRIBUTE_FORCE_INLINE unsigned char CPU(skepu::Region1D<unsigned char> m, const skepu::Vec<float> stencil, unsigned long elemPerPx)
 {
 	float res = 0;
-	int stencil_cpt = 0;
+	int stencil_index = 0;
 	for (int x = -m.oi; x <= m.oi; x += elemPerPx)
-		res += m(x) * stencil(stencil_cpt++);
+		res += m(x) * stencil(stencil_index++);
 
 	return res;
 }
@@ -329,12 +329,12 @@ int main(int argc, char* argv[])
 	// and conv.setOverlap(<integer>)
 	{
 		skepu::backend::MapOverlap1D<skepu_userfunction_skepu_skel_2conv_average_kernel_1d, decltype(&average_precompiled_Overlap1DKernel_average_kernel_1d_MapOverlapKernel_CU), decltype(&average_precompiled_Overlap1DKernel_average_kernel_1d_MapOverlapKernel_CU_Matrix_Row), decltype(&average_precompiled_Overlap1DKernel_average_kernel_1d_MapOverlapKernel_CU_Matrix_Col), decltype(&average_precompiled_Overlap1DKernel_average_kernel_1d_MapOverlapKernel_CU_Matrix_ColMulti), CLWrapperClass_average_precompiled_OverlapKernel_average_kernel_1d> conv(average_precompiled_Overlap1DKernel_average_kernel_1d_MapOverlapKernel_CU, average_precompiled_Overlap1DKernel_average_kernel_1d_MapOverlapKernel_CU_Matrix_Row, average_precompiled_Overlap1DKernel_average_kernel_1d_MapOverlapKernel_CU_Matrix_Col, average_precompiled_Overlap1DKernel_average_kernel_1d_MapOverlapKernel_CU_Matrix_ColMulti);
-		conv.setOverlapMode(skepu::Overlap::RowWise);
+		conv.setOverlapMode(skepu::Overlap::ColWise);
 		conv.setOverlap(radius*imageInfo.elementsPerPixel);
 		auto timeTaken = skepu::benchmark::measureExecTime([&]
 		{
 			conv(tmp, inputMatrix, imageInfo.elementsPerPixel);
-			conv.setOverlapMode(skepu::Overlap::ColWise);
+			conv.setOverlapMode(skepu::Overlap::RowWise);
 			conv.setOverlap(radius);
 			conv(outputMatrixSep, tmp, 1);
 		});

@@ -40,9 +40,9 @@ unsigned char average_kernel_1d(skepu::Region1D<unsigned char> m, size_t elemPer
 unsigned char gaussian_kernel(skepu::Region1D<unsigned char> m, const skepu::Vec<float> stencil, size_t elemPerPx)
 {
 	float res = 0;
-	int stencil_cpt = 0;
+	int stencil_index = 0;
 	for (int x = -m.oi; x <= m.oi; x += elemPerPx)
-		res += m(x) * stencil(stencil_cpt++);
+		res += m(x) * stencil(stencil_index++);
 
 	return res;
 }

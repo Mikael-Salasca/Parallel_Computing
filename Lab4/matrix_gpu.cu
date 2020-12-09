@@ -23,8 +23,8 @@ void add_matrix_cpu(float *a, float *b, float *c, int N) {
 		}
 }
 
-#define BLOCK_X_SIZE 16
-#define BLOCK_Y_SIZE 16
+#define BLOCK_X_SIZE 8
+#define BLOCK_Y_SIZE 8
 
 #define N 8192
 
@@ -58,7 +58,7 @@ int main() {
 		cudaMemcpy(a_gpu,(void*)a, size, cudaMemcpyHostToDevice);
 		cudaMemcpy(b_gpu,(void*)b, size, cudaMemcpyHostToDevice);
 
-		dim3 threadsPerBlock(BLOCK_X_SIZE, BLOCK_Y_SIZE); // 16*16, 256 threads
+		dim3 threadsPerBlock(BLOCK_X_SIZE, BLOCK_Y_SIZE); // 16,16
     dim3 numBlocks(N / threadsPerBlock.x, N / threadsPerBlock.y);
 
 		cudaEventRecord(start_event, 0);
@@ -88,7 +88,6 @@ int main() {
 	}
 	printf("N: %d \n", N);
 	printf("Block size: %d \n", BLOCK_X_SIZE);
-	printf("Nb blocks: %d \n", N / threadsPerBlock.x);
 	printf("GPU - Elapsed time (ms): %f \n", time);
 
 	// CPU
