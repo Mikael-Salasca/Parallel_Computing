@@ -2,7 +2,7 @@
 
 // Compile with a command-line similar to Lab 4:
 // nvcc filter.cu -c -arch=sm_30 -o filter.o
-// g++ filter.o milli.c readppm.c -lGL -lm -lcuda -lcudart -L/usr/local/cuda/lib -lglut -o filter
+  // g++ filter.o milli.c readppm.c -lGL -lm -lcuda -lcudart -L/usr/local/cuda/lib -lglut -o filter
 // or (multicore lab)
 // nvcc filter.cu -c -arch=sm_20 -o filter.o
 // g++ filter.o milli.c readppm.c -lGL -lm -lcuda -L/usr/local/cuda/lib64 -lcudart -lglut -o filter
@@ -33,61 +33,166 @@
 #define maxKernelSizeX 10
 #define maxKernelSizeY 10
 
+#define BLOCK_SIZE 32
 
-__global__ void filter(unsigned char *image, unsigned char *out, const unsigned int imagesizex, const unsigned int imagesizey, const int kernelsizex, const int kernelsizey)
-{
-  // map from blockIdx to pixel position
-	int x = blockIdx.x * blockDim.x + threadIdx.x;
-	int y = blockIdx.y * blockDim.y + threadIdx.y;
+__global__ void filter(unsigned char * image, unsigned char * out,
+    const unsigned int imagesizex,
+        const unsigned int imagesizey,
+            const int kernelsizex,
+                const int kernelsizey) {
+    // map from blockIdx to pixel position
+    int x = blockIdx.x * blockDim.x + threadIdx.x;
+    int y = blockIdx.y * blockDim.y + threadIdx.y;
 
-  int dy, dx;
-  unsigned int sumx, sumy, sumz;
+    int dy, dx;
+    unsigned int sumx, sumy, sumz;
 
-  int divby = (2*kernelsizex+1)*(2*kernelsizey+1); // Works for box filters only!
+    int divby = (2 * kernelsizex + 1) * (2 * kernelsizey + 1); // Works for box filters only!
 
-	if (x < imagesizex && y < imagesizey) // If inside image
-	{
-// Filter kernel (simple box filter)
-	sumx=0;sumy=0;sumz=0;
-	for(dy=-kernelsizey;dy<=kernelsizey;dy++)
-		for(dx=-kernelsizex;dx<=kernelsizex;dx++)
-		{
-			// Use max and min to avoid branching!
-			int yy = min(max(y+dy, 0), imagesizey-1);
-			int xx = min(max(x+dx, 0), imagesizex-1);
+    if (x < imagesizex && y < imagesizey) // If inside image
+    {
+        // Filter kernel (simple box filter)
+        sumx = 0;
+        sumy = 0;
+        sumz = 0;
+        for (dy = -kernelsizey; dy <= kernelsizey; dy++)
+            for (dx = -kernelsizex; dx <= kernelsizex; dx++) {
+                // Use max and min to avoid branching!
+                int yy = min(max(y + dy, 0), imagesizey - 1);
+                int xx = min(max(x + dx, 0), imagesizex - 1);
 
-			sumx += image[((yy)*imagesizex+(xx))*3+0];
-			sumy += image[((yy)*imagesizex+(xx))*3+1];
-			sumz += image[((yy)*imagesizex+(xx))*3+2];
-		}
-	out[(y*imagesizex+x)*3+0] = sumx/divby;
-	out[(y*imagesizex+x)*3+1] = sumy/divby;
-	out[(y*imagesizex+x)*3+2] = sumz/divby;
-	}
+                sumx += image[((yy) * imagesizex + (xx)) * 3 + 0];
+                sumy += image[((yy) * imagesizex + (xx)) * 3 + 1];
+                sumz += image[((yy) * imagesizex + (xx)) * 3 + 2];
+            }
+        out[(y * imagesizex + x) * 3 + 0] = sumx / divby;
+        out[(y * imagesizex + x) * 3 + 1] = sumy / divby;
+        out[(y * imagesizex + x) * 3 + 2] = sumz / divby;
+    }
 }
 
-// Global variables for image data
 
-unsigned char *image, *pixels, *dev_bitmap, *dev_input;
+// Filter optimized with shared memory
+__global__ void filter_optimized(unsigned char * image, unsigned char * out,
+    const unsigned int imagesizex,
+        const unsigned int imagesizey,
+            const int kernelsizex,
+                const int kernelsizey) {
+
+    // Statically allocated shared memory
+    __shared__ int s_i[BLOCK_SIZE * BLOCK_SIZE * 3];
+
+    // Compute each thread's global row and column index
+    int x = blockIdx.x * blockDim.x + threadIdx.x - blockIdx.x * kernelsizex * 2;
+    int y = blockIdx.y * blockDim.y + threadIdx.y - blockIdx.y * kernelsizey * 2;
+
+    int xid = threadIdx.x;
+    int yid = threadIdx.y;
+
+    int offset_image = x + y * imagesizex;
+    int offset_shared = threadIdx.x + yid * blockDim.x;
+
+    // only read the part of the image that is relevant for your computation.
+    s_i[offset_shared * 3 + 0] = image[offset_image * 3 + 0];
+    s_i[offset_shared * 3 + 1] = image[offset_image * 3 + 1];
+    s_i[offset_shared * 3 + 2] = image[offset_image * 3 + 2];
+
+    // Wait for both tiles to be loaded in before doing computation
+    __syncthreads();
+
+    unsigned int sumx, sumy, sumz;
+
+    int divby = (2 * kernelsizex + 1) * (2 * kernelsizey + 1); // Works for box filters only!
+
+    int dy, dx;
+
+    if (x < imagesizex && y < imagesizey) // If inside image
+    {
+        // Filter kernel (simple box filter)
+        sumx = 0;
+        sumy = 0;
+        sumz = 0;
+        for (dx = -kernelsizex; dx <= kernelsizex; ++dx) {
+            for (dy = -kernelsizey; dy <= 2; ++dy) {
+                int xx = min(max(xid + dy, 0), imagesizex - 1);
+                int yy = min(max(yid + dx, 0), imagesizey - 1);
+                sumx += s_i[(xx + yy * blockDim.x) * 3 + 0];
+                sumy += s_i[(xx + yy * blockDim.x) * 3 + 1];
+                sumz += s_i[(xx + yy * blockDim.x) * 3 + 2];
+            }
+        }
+        out[offset_image * 3 + 0] = sumx / divby;
+        out[offset_image * 3 + 1] = sumy / divby;
+        out[offset_image * 3 + 2] = sumz / divby;
+    }
+} // end filter opti
+
+// Global variables for image data
+unsigned char * image, * pixels, * dev_bitmap, * dev_input;
 unsigned int imagesizey, imagesizex; // Image size
 
 ////////////////////////////////////////////////////////////////////////////////
 // main computation function
 ////////////////////////////////////////////////////////////////////////////////
-void computeImages(int kernelsizex, int kernelsizey)
-{
-	if (kernelsizex > maxKernelSizeX || kernelsizey > maxKernelSizeY)
-	{
-		printf("Kernel size out of bounds!\n");
-		return;
-	}
 
-	pixels = (unsigned char *) malloc(imagesizex*imagesizey*3);
+void computeImages(int kernelsizex, int kernelsizey) {
+    if (kernelsizex > maxKernelSizeX || kernelsizey > maxKernelSizeY) {
+        printf("Kernel size out of bounds!\n");
+        return;
+    }
+
+    pixels = (unsigned char * ) malloc(imagesizex * imagesizey * 3);
+    cudaMalloc((void ** ) & dev_input, imagesizex * imagesizey * 3);
+    cudaMemcpy(dev_input, image, imagesizey * imagesizex * 3, cudaMemcpyHostToDevice);
+    cudaMalloc((void ** ) & dev_bitmap, imagesizex * imagesizey * 3);
+    dim3 grid(imagesizex, imagesizey);
+    filter << < grid, 1 >>> (dev_input, dev_bitmap, imagesizex, imagesizey, kernelsizex, kernelsizey); // Awful load balance
+    cudaThreadSynchronize();
+    //	Check for errors!
+    cudaError_t err = cudaGetLastError();
+    if (err != cudaSuccess)
+        printf("Error: %s\n", cudaGetErrorString(err));
+    cudaMemcpy(pixels, dev_bitmap, imagesizey * imagesizex * 3, cudaMemcpyDeviceToHost);
+    cudaFree(dev_bitmap);
+    cudaFree(dev_input);
+}
+
+// ## compute image optimized with shared memory
+
+// #define KERNELSIZE 2
+//
+// #define MAXBLOCKDIM 32
+//
+//
+// int searchBlockSize(const int imageSize, const int maxBlockSize){
+//
+//     for(int i = maxBlockSize; i>0; i--)
+//     {
+//         if(imageSize%i==0)
+//             return i;
+//     }
+//     return 1;
+// }
+
+void computeImages_optimized(int kernelsizex, int kernelsizey) {
+
+  pixels = (unsigned char *) malloc(imagesizex*imagesizey*3);
 	cudaMalloc( (void**)&dev_input, imagesizex*imagesizey*3);
 	cudaMemcpy( dev_input, image, imagesizey*imagesizex*3, cudaMemcpyHostToDevice );
 	cudaMalloc( (void**)&dev_bitmap, imagesizex*imagesizey*3);
-	dim3 grid(imagesizex,imagesizey);
-	filter<<<grid,1>>>(dev_input, dev_bitmap, imagesizex, imagesizey, kernelsizex, kernelsizey); // Awful load balance
+
+  // int blockX=searchBlockSize(imagesizex - 2 * KERNELSIZE, MAXBLOCKDIM - KERNELSIZE * 2) + KERNELSIZE * 2;
+  // int blockY=searchBlockSize(imagesizey - 2 * KERNELSIZE, MAXBLOCKDIM - KERNELSIZE * 2) + KERNELSIZE * 2;
+	// printf("bx=%d by=%d\n",blockX,blockY);
+	// dim3 block(blockX,blockY);
+	// int gridX=(imagesizex - 2 * KERNELSIZE) / (blockX - KERNELSIZE * 2);
+	// int gridY=(imagesizey - 2 * KERNELSIZE) / (blockY - KERNELSIZE * 2);
+	// printf("gx=%d gy=%d\n",gridX,gridY);
+	// dim3 grid(gridX,gridY);
+  dim3 threadsPerBlock( 16, 16);
+  dim3 numBlocks( imagesizex/threadsPerBlock.x, imagesizey/threadsPerBlock.y);
+	filter_optimized<<<numBlocks,threadsPerBlock>>>(dev_input, dev_bitmap, imagesizey, imagesizex,kernelsizex,kernelsizey); // Awful load balance
+
 	cudaThreadSynchronize();
 //	Check for errors!
     cudaError_t err = cudaGetLastError();
@@ -99,54 +204,51 @@ void computeImages(int kernelsizex, int kernelsizey)
 }
 
 // Display images
-void Draw()
-{
-// Dump the whole picture onto the screen.
-	glClearColor( 0.0, 0.0, 0.0, 1.0 );
-	glClear( GL_COLOR_BUFFER_BIT );
+void Draw() {
+    // Dump the whole picture onto the screen.
+    glClearColor(0.0, 0.0, 0.0, 1.0);
+    glClear(GL_COLOR_BUFFER_BIT);
 
-	if (imagesizey >= imagesizex)
-	{ // Not wide - probably square. Original left, result right.
-		glRasterPos2f(-1, -1);
-		glDrawPixels( imagesizex, imagesizey, GL_RGB, GL_UNSIGNED_BYTE, image );
-		glRasterPos2i(0, -1);
-		glDrawPixels( imagesizex, imagesizey, GL_RGB, GL_UNSIGNED_BYTE,  pixels);
-	}
-	else
-	{ // Wide image! Original on top, result below.
-		glRasterPos2f(-1, -1);
-		glDrawPixels( imagesizex, imagesizey, GL_RGB, GL_UNSIGNED_BYTE, pixels );
-		glRasterPos2i(-1, 0);
-		glDrawPixels( imagesizex, imagesizey, GL_RGB, GL_UNSIGNED_BYTE, image );
-	}
-	glFlush();
+    if (imagesizey >= imagesizex) { // Not wide - probably square. Original left, result right.
+        glRasterPos2f(-1, -1);
+        glDrawPixels(imagesizex, imagesizey, GL_RGB, GL_UNSIGNED_BYTE, image);
+        glRasterPos2i(0, -1);
+        glDrawPixels(imagesizex, imagesizey, GL_RGB, GL_UNSIGNED_BYTE, pixels);
+    } else { // Wide image! Original on top, result below.
+        glRasterPos2f(-1, -1);
+        glDrawPixels(imagesizex, imagesizey, GL_RGB, GL_UNSIGNED_BYTE, pixels);
+        glRasterPos2i(-1, 0);
+        glDrawPixels(imagesizex, imagesizey, GL_RGB, GL_UNSIGNED_BYTE, image);
+    }
+    glFlush();
 }
 
 // Main program, inits
-int main( int argc, char** argv)
-{
-	glutInit(&argc, argv);
-	glutInitDisplayMode( GLUT_SINGLE | GLUT_RGBA );
+int main(int argc, char ** argv) {
+    glutInit( & argc, argv);
+    glutInitDisplayMode(GLUT_SINGLE | GLUT_RGBA);
 
-	if (argc > 1)
-		image = readppm(argv[1], (int *)&imagesizex, (int *)&imagesizey);
-	else
-		image = readppm((char *)"maskros512.ppm", (int *)&imagesizex, (int *)&imagesizey);
+    if (argc > 1)
+        image = readppm(argv[1], (int * ) & imagesizex, (int * ) & imagesizey);
+    else
+        image = readppm((char * )
+            "maskros512.ppm", (int * ) & imagesizex, (int * ) & imagesizey);
 
-	if (imagesizey >= imagesizex)
-		glutInitWindowSize( imagesizex*2, imagesizey );
-	else
-		glutInitWindowSize( imagesizex, imagesizey*2 );
-	glutCreateWindow("Lab 5");
-	glutDisplayFunc(Draw);
+    if (imagesizey >= imagesizex)
+        glutInitWindowSize(imagesizex * 2, imagesizey);
+    else
+        glutInitWindowSize(imagesizex, imagesizey * 2);
+    glutCreateWindow("Lab 5");
+    glutDisplayFunc(Draw);
 
-	ResetMilli();
+    ResetMilli();
 
-	computeImages(2, 2);
+    //computeImages(2, 2);
+    computeImages_optimized(2, 2);
 
-// You can save the result to a file like this:
-//	writeppm("out.ppm", imagesizey, imagesizex, pixels);
+    // You can save the result to a file like this:
+    //	writeppm("out.ppm", imagesizey, imagesizex, pixels);
 
-	glutMainLoop();
-	return 0;
+    glutMainLoop();
+    return 0;
 }
