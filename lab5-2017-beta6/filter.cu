@@ -189,8 +189,9 @@ void computeImages_optimized(int kernelsizex, int kernelsizey) {
 	// int gridY=(imagesizey - 2 * KERNELSIZE) / (blockY - KERNELSIZE * 2);
 	// printf("gx=%d gy=%d\n",gridX,gridY);
 	// dim3 grid(gridX,gridY);
-  dim3 threadsPerBlock( 16, 16);
-  dim3 numBlocks( imagesizex/threadsPerBlock.x, imagesizey/threadsPerBlock.y);
+  dim3 threadsPerBlock( 16 + 2*kernelsizex, 16+2*kernelsizey);
+  dim3 numBlocks( (imagesizex - 2 * kernelsizex) / (threadsPerBlock.x - 2 *kernelsizex) + 1,
+                  (imagesizey - 2 * kernelsizey) / (threadsPerBlock.y - 2 *kernelsizex) + 1);
 	filter_optimized<<<numBlocks,threadsPerBlock>>>(dev_input, dev_bitmap, imagesizey, imagesizex,kernelsizex,kernelsizey); // Awful load balance
 
 	cudaThreadSynchronize();
