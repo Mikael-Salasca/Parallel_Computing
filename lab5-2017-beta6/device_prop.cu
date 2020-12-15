@@ -1,5 +1,33 @@
 #include <stdio.h>
 // nvcc device_prop.cu -o dP
+// 
+// struct cudaDeviceProp {
+//     char name[256];
+//     size_t totalGlobalMem;
+//     size_t sharedMemPerBlock;
+//     int regsPerBlock;
+//     int warpSize;
+//     size_t memPitch;
+//     int maxThreadsPerBlock;
+//     int maxThreadsDim[3];
+//     int maxGridSize[3];
+//     size_t totalConstMem;
+//     int major;
+//     int minor;
+//     int clockRate;
+//     size_t textureAlignment;
+//     int deviceOverlap;
+//     int multiProcessorCount;
+//     int kernelExecTimeoutEnabled;
+//     int integrated;
+//     int canMapHostMemory;
+//     int computeMode;
+//     int concurrentKernels;
+//     int ECCEnabled;
+//     int pciBusID;
+//     int pciDeviceID;
+//     int tccDriver;
+// }
 
 int main() {
   int nDevices;

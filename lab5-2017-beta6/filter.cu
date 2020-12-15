@@ -33,10 +33,12 @@
 #define maxKernelSizeX 10
 #define maxKernelSizeY 10
 
-#define TILE_W 16
-#define TILE_H 16
-#define kernelsizex 7
-#define kernelsizey 7
+#define TILE_W 8
+#define TILE_H 8
+#define KS_X 3
+#define KS_Y 3
+#define VERSION 2 // 1 naive, 2 shared, 3 shared sep,
+
 
 __managed__
 int kernelsize_pad = 0;
@@ -47,7 +49,9 @@ int BLOCK_H = 0;
 
 __global__ void filter(unsigned char * image, unsigned char * out,
     const unsigned int imagesizex,
-        const unsigned int imagesizey) {
+        const unsigned int imagesizey,
+        const int kernelsizex,
+          const int kernelsizey) {
     // map from blockIdx to pixel position
     int x = blockIdx.x * blockDim.x + threadIdx.x;
     int y = blockIdx.y * blockDim.y + threadIdx.y;
@@ -82,9 +86,11 @@ __global__ void filter(unsigned char * image, unsigned char * out,
 
 
 // Filter optimized with shared memory
-__global__ void filter_optimized(unsigned char * image, unsigned char * out,
+__global__ void filter_shared(unsigned char * image, unsigned char * out,
     const unsigned int imagesizex,
-        const unsigned int imagesizey) {
+        const unsigned int imagesizey,
+          const int kernelsizex,
+            const int kernelsizey) {
 
     // Statically allocated shared memory
     __shared__ int s_i[(TILE_W + 2*maxKernelSizeX) * (TILE_H + 2*maxKernelSizeY) * 3];
@@ -115,7 +121,6 @@ __global__ void filter_optimized(unsigned char * image, unsigned char * out,
     // Only threads inside the apron will write results
     if ((threadIdx.x >= kernelsizex)
           && (threadIdx.x < BLOCK_W - kernelsizex)
-            && (threadIdx.x < BLOCK_W - kernelsizex)
               && (threadIdx.y >= kernelsizey)
                 && (threadIdx.y < BLOCK_H - kernelsizey))
     {
@@ -123,8 +128,8 @@ __global__ void filter_optimized(unsigned char * image, unsigned char * out,
         sumR = 0;
         sumG = 0;
         sumB = 0;
-        for (dx = -kernelsizex; dx <= kernelsizex; ++dx) {
-            for (dy = -kernelsizey; dy <= kernelsizey; ++dy) {
+        for (dy = -kernelsizey; dy <= kernelsizey; ++dy) {
+          for (dx = -kernelsizex; dx <= kernelsizex; ++dx) {
                 sumR += s_i[(b_index + dy*blockDim.x + dx) * 3 + 0];
                 sumG += s_i[(b_index + dy*blockDim.x + dx) * 3 + 1];
                 sumB += s_i[(b_index + dy*blockDim.x + dx) * 3 + 2];
@@ -136,6 +141,27 @@ __global__ void filter_optimized(unsigned char * image, unsigned char * out,
     } // end if
 } // end filter opti
 
+
+// Filter optimized with shared memory
+__global__ void filter_gauss_horizontal(unsigned char * image, unsigned char * out,
+    const unsigned int imagesizex,
+        const unsigned int imagesizey,
+          const int kernelsizex,
+            const int kernelsizey) {
+
+} // end filter gauss horiz
+
+
+// Filter optimized with shared memory
+__global__ void filter_gauss_(unsigned char * image, unsigned char * out,
+    const unsigned int imagesizex,
+        const unsigned int imagesizey,
+          const int kernelsizex,
+            const int kernelsizey) {
+
+
+} // end filter gauss vertical
+
 // Global variables for image data
 unsigned char * image, * pixels, * dev_bitmap, * dev_input;
 unsigned int imagesizey, imagesizex; // Image size
@@ -144,7 +170,7 @@ unsigned int imagesizey, imagesizex; // Image size
 // main computation function
 ////////////////////////////////////////////////////////////////////////////////
 
-void computeImages() {
+void computeImages(int kernelsizex, int kernelsizey) {
     if (kernelsizex > maxKernelSizeX || kernelsizey > maxKernelSizeY) {
         printf("Kernel size out of bounds!\n");
         return;
@@ -162,7 +188,7 @@ void computeImages() {
     cudaEventCreate(&end);
     cudaEventRecord(start, 0);
 
-    filter << < grid, 1 >>> (dev_input, dev_bitmap, imagesizex, imagesizey); // Awful load balance
+    filter << < grid, 1 >>> (dev_input, dev_bitmap, imagesizex, imagesizey,kernelsizex,kernelsizey); // Awful load balance
 
     cudaDeviceSynchronize();
     cudaEventRecord(end, 0);
@@ -183,7 +209,7 @@ void computeImages() {
 
 inline unsigned int iDivUp( const unsigned int &a, const unsigned int &b ) { return ( a%b != 0 ) ? (a/b+1):(a/b); }
 
-void computeImages_optimized() {
+void computeImages_shared(int kernelsizex, int kernelsizey) {
 
   pixels = (unsigned char *) malloc(imagesizex*imagesizey*3);
 	cudaMalloc( (void**)&dev_input, imagesizex*imagesizey*3);
@@ -209,7 +235,7 @@ void computeImages_optimized() {
   cudaEventCreate(&end);
   cudaEventRecord(start, 0);
 
-	filter_optimized<<<grid,threadBlock>>>(dev_input, dev_bitmap, imagesizey, imagesizex);
+	filter_shared<<<grid,threadBlock>>>(dev_input, dev_bitmap, imagesizey, imagesizex, kernelsizex, kernelsizey);
 
   cudaDeviceSynchronize();
   cudaEventRecord(end, 0);
@@ -217,7 +243,7 @@ void computeImages_optimized() {
   cudaEventElapsedTime(&time, start, end);
   cudaEventDestroy(start);
   cudaEventDestroy(end);
-  printf("Optimized version - Elapsed time (ms): %f \n", time);
+  printf("Shared memory version - Elapsed time (ms): %f \n", time);
 
 	cudaThreadSynchronize();
 //	Check for errors!
@@ -227,7 +253,55 @@ void computeImages_optimized() {
 	cudaMemcpy( pixels, dev_bitmap, imagesizey*imagesizex*3, cudaMemcpyDeviceToHost );
 	cudaFree( dev_bitmap );
 	cudaFree( dev_input );
-}
+} // end compute __shared__
+
+void computeImages_shared_separable(int kernelsizex, int kernelsizey) {
+
+  pixels = (unsigned char *) malloc(imagesizex*imagesizey*3);
+	cudaMalloc( (void**)&dev_input, imagesizex*imagesizey*3);
+	cudaMemcpy( dev_input, image, imagesizey*imagesizex*3, cudaMemcpyHostToDevice );
+	cudaMalloc( (void**)&dev_bitmap, imagesizex*imagesizey*3);
+
+   kernelsize_pad = max(kernelsizex,kernelsizey);
+   BLOCK_W = TILE_W + 2*kernelsize_pad;
+   BLOCK_H = TILE_H + 2*kernelsize_pad;
+
+
+  const dim3 grid( iDivUp( imagesizex, TILE_W ), iDivUp( imagesizey, TILE_H ) );
+  printf("gx=%d\n", grid.x);
+  printf("gy=%d\n", grid.y);
+  const dim3 threadBlock( BLOCK_W, BLOCK_W );
+  printf("bx=%d\n", threadBlock.x);
+  printf("by=%d\n", threadBlock.y);
+
+  cudaEvent_t start;
+  cudaEvent_t end;
+  float time;
+  cudaEventCreate(&start);
+  cudaEventCreate(&end);
+  cudaEventRecord(start, 0);
+
+	filter_shared<<<grid,threadBlock>>>(dev_input, dev_bitmap, imagesizey, imagesizex, kernelsizex, 1);
+  cudaDeviceSynchronize();
+  filter_shared<<<grid,threadBlock>>>(dev_bitmap, dev_bitmap, imagesizey, imagesizex, 1, kernelsizey);
+
+  cudaDeviceSynchronize();
+  cudaEventRecord(end, 0);
+  cudaEventSynchronize(end);
+  cudaEventElapsedTime(&time, start, end);
+  cudaEventDestroy(start);
+  cudaEventDestroy(end);
+  printf("Separable version - Elapsed time (ms): %f \n", time);
+
+	cudaThreadSynchronize();
+//	Check for errors!
+    cudaError_t err = cudaGetLastError();
+    if (err != cudaSuccess)
+        printf("Error: %s\n", cudaGetErrorString(err));
+	cudaMemcpy( pixels, dev_bitmap, imagesizey*imagesizex*3, cudaMemcpyDeviceToHost );
+	cudaFree( dev_bitmap );
+	cudaFree( dev_input );
+}// end compute shared separable
 
 // Display images
 void Draw() {
@@ -269,8 +343,26 @@ int main(int argc, char ** argv) {
 
     ResetMilli();
 
-    //computeImages();
-    computeImages_optimized();
+    printf("Kernel size X=%d\n",KS_X );
+    printf("Kernel size Y=%d\n",KS_Y );
+    printf("Kernel size =%d\n", ((KS_X*2+1) * (KS_Y*2+1)));
+
+    int v = VERSION;
+    switch (v) {
+      case 1:
+        computeImages(KS_X,KS_Y);
+        break;
+      case 2:
+        computeImages_shared(KS_X,KS_Y);
+        break;
+      case 3:
+        computeImages_shared_separable(KS_X,KS_Y);
+        break;
+      default:
+        computeImages(KS_X,KS_Y);
+        break;
+    }
+
 
     // You can save the result to a file like this:
     //	writeppm("out.ppm", imagesizey, imagesizex, pixels);
