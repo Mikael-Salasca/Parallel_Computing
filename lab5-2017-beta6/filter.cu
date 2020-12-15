@@ -99,7 +99,7 @@ __global__ void filter_optimized(unsigned char * image, unsigned char * out,
     int index = x + y * imagesizex;
     int b_index = threadIdx.y * blockDim.y + threadIdx.x;
 
-    // only read the part of the image that is relevant for your computation. ie each thread loads one pixel
+    // eah thread copies its pixel of the block to shared memory
     s_i[b_index * 3 + 0] = image[index * 3 + 0];
     s_i[b_index * 3 + 1] = image[index * 3 + 1];
     s_i[b_index * 3 + 2] = image[index * 3 + 2];
@@ -155,9 +155,22 @@ void computeImages() {
     cudaMemcpy(dev_input, image, imagesizey * imagesizex * 3, cudaMemcpyHostToDevice);
     cudaMalloc((void ** ) & dev_bitmap, imagesizex * imagesizey * 3);
     dim3 grid(imagesizex, imagesizey);
+    cudaEvent_t start;
+    cudaEvent_t end;
+    float time;
+    cudaEventCreate(&start);
+    cudaEventCreate(&end);
+    cudaEventRecord(start, 0);
+
     filter << < grid, 1 >>> (dev_input, dev_bitmap, imagesizex, imagesizey); // Awful load balance
-    cudaThreadSynchronize();
-    //	Check for errors!
+
+    cudaDeviceSynchronize();
+    cudaEventRecord(end, 0);
+    cudaEventSynchronize(end);
+    cudaEventElapsedTime(&time, start, end);
+    cudaEventDestroy(start);
+    cudaEventDestroy(end);
+    printf("Naive version - Elapsed time (ms): %f \n", time);    //	Check for errors!
     cudaError_t err = cudaGetLastError();
     if (err != cudaSuccess)
         printf("Error: %s\n", cudaGetErrorString(err));
@@ -177,7 +190,7 @@ void computeImages_optimized() {
 	cudaMemcpy( dev_input, image, imagesizey*imagesizex*3, cudaMemcpyHostToDevice );
 	cudaMalloc( (void**)&dev_bitmap, imagesizex*imagesizey*3);
 
-   kernelsize_pad = (kernelsizex > kernelsizey) ? kernelsizex : kernelsizey;
+   kernelsize_pad = max(kernelsizex,kernelsizey);
    BLOCK_W = TILE_W + 2*kernelsize_pad;
    BLOCK_H = TILE_H + 2*kernelsize_pad;
 
@@ -189,7 +202,22 @@ void computeImages_optimized() {
   printf("bx=%d\n", threadBlock.x);
   printf("by=%d\n", threadBlock.y);
 
-	filter_optimized<<<grid,threadBlock>>>(dev_input, dev_bitmap, imagesizey, imagesizex); // Awful load balance
+  cudaEvent_t start;
+  cudaEvent_t end;
+  float time;
+  cudaEventCreate(&start);
+  cudaEventCreate(&end);
+  cudaEventRecord(start, 0);
+
+	filter_optimized<<<grid,threadBlock>>>(dev_input, dev_bitmap, imagesizey, imagesizex);
+
+  cudaDeviceSynchronize();
+  cudaEventRecord(end, 0);
+  cudaEventSynchronize(end);
+  cudaEventElapsedTime(&time, start, end);
+  cudaEventDestroy(start);
+  cudaEventDestroy(end);
+  printf("Optimized version - Elapsed time (ms): %f \n", time);
 
 	cudaThreadSynchronize();
 //	Check for errors!
