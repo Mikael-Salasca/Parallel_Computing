@@ -35,11 +35,15 @@
 
 #define TILE_W 16
 #define TILE_H 16
-#define kernelsizex 3
-#define kernelsizey 2
-const int BLOCK_W = TILE_W + 2*kernelsizex;
-const int BLOCK_H = TILE_H + 2*kernelsizey;
+#define kernelsizex 7
+#define kernelsizey 7
 
+__managed__
+int kernelsize_pad = 0;
+__managed__
+int BLOCK_W = 0;
+__managed__
+int BLOCK_H = 0;
 
 __global__ void filter(unsigned char * image, unsigned char * out,
     const unsigned int imagesizex,
@@ -83,11 +87,10 @@ __global__ void filter_optimized(unsigned char * image, unsigned char * out,
         const unsigned int imagesizey) {
 
     // Statically allocated shared memory
-    __shared__ int s_i[BLOCK_W * BLOCK_H * 3];
+    __shared__ int s_i[(TILE_W + 2*maxKernelSizeX) * (TILE_H + 2*maxKernelSizeY) * 3];
 
-    // Compute each thread's global row and column index
-    int x = blockIdx.x * TILE_W + threadIdx.x - kernelsizex;
-    int y = blockIdx.y * TILE_H + threadIdx.y - kernelsizey;
+    int x = blockIdx.x * TILE_W + threadIdx.x - kernelsize_pad;
+    int y = blockIdx.y * TILE_H + threadIdx.y - kernelsize_pad;
 
     // clamp to edge of image
     x = min(max(x, 0), imagesizex-1);
@@ -174,15 +177,15 @@ void computeImages_optimized() {
 	cudaMemcpy( dev_input, image, imagesizey*imagesizex*3, cudaMemcpyHostToDevice );
 	cudaMalloc( (void**)&dev_bitmap, imagesizex*imagesizey*3);
 
-  const unsigned int blockW = 16;
-  const unsigned int blockH = 16;
-  const unsigned int tileW = blockW + 2 * kernelsizex;
-  const unsigned int tileH = blockH + 2 * kernelsizey;
-  const unsigned int threadBlockH = 8;
-  const dim3 grid( iDivUp( imagesizex, blockW ), iDivUp( imagesizey, blockH ) );
+   kernelsize_pad = (kernelsizex > kernelsizey) ? kernelsizex : kernelsizey;
+   BLOCK_W = TILE_W + 2*kernelsize_pad;
+   BLOCK_H = TILE_H + 2*kernelsize_pad;
+
+
+  const dim3 grid( iDivUp( imagesizex, TILE_W ), iDivUp( imagesizey, TILE_H ) );
   printf("gx=%d\n", grid.x);
   printf("gy=%d\n", grid.y);
-  const dim3 threadBlock( tileW, tileH );
+  const dim3 threadBlock( BLOCK_W, BLOCK_W );
   printf("bx=%d\n", threadBlock.x);
   printf("by=%d\n", threadBlock.y);
 
