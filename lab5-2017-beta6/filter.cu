@@ -124,7 +124,7 @@ __global__ void filter_optimized(unsigned char * image, unsigned char * out,
         sumG = 0;
         sumB = 0;
         for (dx = -kernelsizex; dx <= kernelsizex; ++dx) {
-            for (dy = -kernelsizey; dy <= 2; ++dy) {
+            for (dy = -kernelsizey; dy <= kernelsizey; ++dy) {
                 sumR += s_i[(b_index + dy*blockDim.x + dx) * 3 + 0];
                 sumG += s_i[(b_index + dy*blockDim.x + dx) * 3 + 1];
                 sumB += s_i[(b_index + dy*blockDim.x + dx) * 3 + 2];
