@@ -27,7 +27,7 @@
 #include "milli.h"
 
 // Size of data!
-#define kDataLength 1024
+#define kDataLength 1 << 20
 #define MAXPRINTSIZE 16
 
 unsigned int *generateRandomData(unsigned int length)
@@ -164,12 +164,26 @@ int main( int argc, char** argv)
 
   ResetMilli(); // You may consider moving this inside find_max_gpu(), to skip timing of data allocation.
   find_max_gpu(data_gpu,length);
-  printf("GPU %f\n", GetSeconds());
 
-  // Print part of result
-  for (int i=0;i<MAXPRINTSIZE;i++)
-    printf("%d ", data_gpu[i]);
-  printf("\n");
+  // idle computes the max between each block's max
+    unsigned int i, m;
+    m = data_gpu[0];
+    for (i=512;i<length;i+=512) // Loop over data
+    {
+      if (data_gpu[i] > m)
+        m = data_gpu[i];
+    }
+    data_gpu[0] = m;
+
+  printf("GPU %f\n", GetSeconds());
+  printf("Max CPU = %d \n", data_cpu[0]);
+
+
+
+  //Print part of result
+  // for (int i=0;i<MAXPRINTSIZE;i++)
+  //   printf("%d ", data_gpu[i]);
+  // printf("\n");
 
   if (data_cpu[0] != data_gpu[0])
     {

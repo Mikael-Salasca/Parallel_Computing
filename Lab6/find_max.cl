@@ -10,7 +10,8 @@ __kernel void find_max(__global unsigned int *data, const unsigned int length) {
     int thread_id = get_global_id(0);
     int localthread_id = get_local_id(0);
     int local_size = get_local_size(0);
-    __local unsigned int shared_mem[1024];
+    __local unsigned int shared_mem[512];
+
 
     // load in shared memory
     shared_mem[localthread_id] = data[thread_id];
@@ -25,6 +26,8 @@ __kernel void find_max(__global unsigned int *data, const unsigned int length) {
                barrier(CLK_GLOBAL_MEM_FENCE|CLK_LOCAL_MEM_FENCE);
            }
 
-       if (localthread_id == 0) data[0] = shared_mem[0];
+       if (localthread_id == 0){
+         data[get_group_id(0)*local_size] = shared_mem[0];
+        }
 
 }

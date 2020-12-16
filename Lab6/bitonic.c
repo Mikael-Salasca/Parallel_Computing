@@ -25,7 +25,7 @@
 #include "milli.h"
 
 // Size of data!
-#define kDataLength 1024
+#define kDataLength 1 << 12
 #define MAXPRINTSIZE 16
 
 unsigned int *generateRandomData(unsigned int length)
@@ -60,22 +60,31 @@ void runKernel(cl_kernel kernel, int threads, cl_mem data, unsigned int length)
 {
 	size_t localWorkSize, globalWorkSize;
 	cl_int ciErrNum = CL_SUCCESS;
-	
+
 	// Some reasonable number of blocks based on # of threads
 	if (threads<512) localWorkSize  = threads;
 	else            localWorkSize  = 512;
 		globalWorkSize = threads;
-	
+
 	// set the args values
 	ciErrNum  = clSetKernelArg(kernel, 0, sizeof(cl_mem),  (void *) &data);
 	ciErrNum |= clSetKernelArg(kernel, 1, sizeof(cl_uint), (void *) &length);
 	printCLError(ciErrNum,8);
-	
+
 	// Run kernel
 	cl_event event;
-	ciErrNum = clEnqueueNDRangeKernel(commandQueue, kernel, 1, NULL, &globalWorkSize, &localWorkSize, 0, NULL, &event);
-	printCLError(ciErrNum,9);
-	
+  unsigned int k, j;
+  for (k=2;k<=globalWorkSize;k=2*k) // Outer loop, double size for each step
+  {
+    for (j=k>>1;j>0;j=j>>1) // Inner loop, half size for each step
+    {
+      ciErrNum |= clSetKernelArg(kernel, 2, sizeof(cl_uint), (void *) &j);
+      ciErrNum |= clSetKernelArg(kernel, 3, sizeof(cl_uint), (void *) &k);
+      ciErrNum = clEnqueueNDRangeKernel(commandQueue, kernel, 1, NULL, &globalWorkSize, &localWorkSize, 0, NULL, &event);
+    }
+  }
+  printCLError(ciErrNum,9);
+
 	// Synch
 	clWaitForEvents(1, &event);
 	printCLError(ciErrNum,10);
@@ -104,7 +113,7 @@ int bitonic_gpu(unsigned int *data, unsigned int length)
 	// Synch
 	clWaitForEvents(1, &event);
 	printCLError(ciErrNum,10);
-  
+
 	clReleaseMemObject(io_data);
 	return ciErrNum;
 }
@@ -144,14 +153,14 @@ void bitonic_cpu(unsigned int *data, int N)
 
 // ------------ main ------------
 
-int main( int argc, char** argv) 
+int main( int argc, char** argv)
 {
   int length = kDataLength; // SIZE OF DATA
   unsigned short int header[2];
-  
+
   // Computed data
   unsigned int *data_cpu, *data_gpu;
-  
+
   // Find a platform and device
   if (initOpenCL()<0)
   {
@@ -169,11 +178,11 @@ int main( int argc, char** argv)
     printf("\nError allocating data.\n\n");
     return 1;
   }
-  
+
   // Copy to gpu data.
   for(int i=0;i<length;i++)
     data_gpu[i]=data_cpu[i];
-  
+
   ResetMilli();
   bitonic_cpu(data_cpu,length);
   printf("CPU %f\n", GetSeconds());
