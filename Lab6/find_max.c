@@ -159,6 +159,8 @@ int main( int argc, char** argv)
   ResetMilli();
   find_max_cpu(data_cpu,length);
   printf("CPU %f\n", GetSeconds());
+  printf("Max CPU = %d \n", data_cpu[0]);
+
 
   ResetMilli(); // You may consider moving this inside find_max_gpu(), to skip timing of data allocation.
   find_max_gpu(data_gpu,length);
