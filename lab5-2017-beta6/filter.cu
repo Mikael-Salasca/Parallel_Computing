@@ -317,8 +317,6 @@ __global__ void filter_median_horizontal(unsigned char * image, unsigned char * 
         // sort arrays
         unsigned int i,j,k;
 
-        //if (threadIdx.x == 0) {
-
           for (k=2;k<=arr_index;k=2*k) // Outer loop, double size for each step
           {
             for (j=k>>1;j>0;j=j>>1) // Inner loop, half size for each step
@@ -340,13 +338,11 @@ __global__ void filter_median_horizontal(unsigned char * image, unsigned char * 
               }
             }
           }
-        //}
 
-        //__syncthreads();
 
-        out[index * 3 + 0] = arr_R[(arr_index-1)/2];
-        out[index * 3 + 1] = arr_G[(arr_index-1)/2];
-        out[index * 3 + 2] = arr_B[(arr_index-1)/2];
+        out[index * 3 + 0] = (arr_R[arr_index/2] + arr_R[arr_index/2 - 1]) / 2.0;
+        out[index * 3 + 1] = (arr_G[arr_index/2] + arr_G[arr_index/2 - 1]) / 2.0;
+        out[index * 3 + 2] = (arr_B[arr_index/2] + arr_B[arr_index/2 - 1]) / 2.0;
     } // end if
 } // end filter median horizontal
 
@@ -401,8 +397,6 @@ __global__ void filter_median_vertical(unsigned char * image, unsigned char * ou
         // sort arrays
         unsigned int i,j,k;
 
-        //if (threadIdx.x == 0) {
-
           for (k=2;k<=arr_index;k=2*k) // Outer loop, double size for each step
           {
             for (j=k>>1;j>0;j=j>>1) // Inner loop, half size for each step
@@ -424,13 +418,11 @@ __global__ void filter_median_vertical(unsigned char * image, unsigned char * ou
               }
             }
           }
-        //}
 
-        //__syncthreads();
 
-        out[index * 3 + 0] = arr_R[(arr_index-1)/2];
-        out[index * 3 + 1] = arr_G[(arr_index-1)/2];
-        out[index * 3 + 2] = arr_B[(arr_index-1)/2];
+        out[index * 3 + 0] = (arr_R[arr_index/2] + arr_R[arr_index/2 - 1]) / 2.0;
+        out[index * 3 + 1] = (arr_G[arr_index/2] + arr_G[arr_index/2 - 1]) / 2.0;
+        out[index * 3 + 2] = (arr_B[arr_index/2] + arr_B[arr_index/2 - 1]) / 2.0;
     } // end if
 } // end filter median horizontal
 
@@ -705,7 +697,7 @@ int main(int argc, char ** argv) {
         image = readppm(argv[1], (int * ) & imagesizex, (int * ) & imagesizey);
     else
         image = readppm((char * )
-            "maskros512.ppm", (int * ) & imagesizex, (int * ) & imagesizey);
+            "maskros-noisy.ppm", (int * ) & imagesizex, (int * ) & imagesizey);
 
     if (imagesizey >= imagesizex)
         glutInitWindowSize(imagesizex * 2, imagesizey);
