@@ -1,1 +1,2 @@
-# TDDD56
+# Parallel Computing
+TDDD56 labs @ LiU
